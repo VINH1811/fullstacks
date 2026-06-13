@@ -1,25 +1,104 @@
 <template>
   <section class="page" :class="{ loading }">
-    <div v-if="message" class="alert" :class="messageType">{{ message }}</div>
+    <div v-if="message" class="alert" :class="messageType">
+      {{ message }}
+    </div>
 
-    <article class="card">
-      <div class="card-header compact-header">
-        <div class="card-title">
-          <h2>Nhân viên</h2>
-          <p>Tạo hồ sơ nhân viên. Có thể cấp tài khoản ngay hoặc cấp sau khi sửa.</p>
-        </div>
-        <div class="toolbar wrap-mobile">
-          <input v-model.trim="filters.search" placeholder="Tìm tên hoặc mã" @keyup.enter="loadEmployees" />
-          <select v-model="filters.departmentId" @change="loadEmployees">
-            <option value="">Tất cả phòng ban</option>
-            <option v-for="dept in departments" :key="dept.departmentId" :value="dept.departmentId">
-              {{ dept.departmentName }}
-            </option>
-          </select>
-          <button class="btn ghost" @click="loadEmployees">Lọc</button>
-          <button class="btn primary" @click="openCreate">+ Thêm nhân viên</button>
-        </div>
+    <article class="card employee-card">
+    <div class="employee-head">
+  <h2>Nhân viên</h2>
+</div>
+
+<div class="employee-tools">
+  <div class="search-group">
+    <input
+      v-model.trim="filters.search"
+      placeholder="Tìm theo mã NV"
+      @input="scheduleSearch"
+      @keyup.enter="loadEmployees"
+    />
+
+    <div class="filter-box">
+      <button
+        class="filter-btn"
+        :class="{ active: filters.departmentId || filters.status }"
+        title="Bộ lọc"
+        @click="showDepartmentFilter = !showDepartmentFilter"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M4 6h16M7 12h10M10 18h4"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+      </button>
+
+      <div v-if="showDepartmentFilter" class="filter-popover">
+        <div class="filter-title">Phòng ban</div>
+
+        <button
+          class="filter-option"
+          :class="{ active: !filters.departmentId }"
+          @click="selectDepartment('')"
+        >
+          Tất cả phòng ban
+        </button>
+
+        <button
+          v-for="dept in departments"
+          :key="dept.departmentId"
+          class="filter-option"
+          :class="{ active: filters.departmentId === dept.departmentId }"
+          @click="selectDepartment(dept.departmentId)"
+        >
+          {{ dept.departmentName }}
+        </button>
+
+        <div class="filter-divider"></div>
+
+        <div class="filter-title">Trạng thái</div>
+
+        <button
+          class="filter-option"
+          :class="{ active: !filters.status }"
+          @click="selectStatus('')"
+        >
+          Tất cả trạng thái
+        </button>
+
+        <button
+          class="filter-option"
+          :class="{ active: filters.status === 'Active' }"
+          @click="selectStatus('Active')"
+        >
+          Đang làm
+        </button>
+
+        <button
+          class="filter-option"
+          :class="{ active: filters.status === 'Probation' }"
+          @click="selectStatus('Probation')"
+        >
+          Thử việc
+        </button>
+
+        <button
+          class="filter-option"
+          :class="{ active: filters.status === 'Inactive' }"
+          @click="selectStatus('Inactive')"
+        >
+          Nghỉ việc
+        </button>
       </div>
+    </div>
+  </div>
+
+  <button class="add-btn" title="Thêm nhân viên" @click="openCreate">
+    +
+  </button>
+</div>
 
       <div class="table-wrap">
         <table>
@@ -30,32 +109,62 @@
               <th>Email</th>
               <th>Phòng ban</th>
               <th>Trạng thái</th>
-              <th>Thao tác</th>
+              <th class="text-right">Thao tác</th>
             </tr>
           </thead>
+
           <tbody>
             <tr v-for="employee in employees" :key="empId(employee)">
-              <td><strong>{{ empCode(employee) }}</strong></td>
-              <td class="name-cell">
-                <strong>{{ empCode(employee) }} - {{ empName(employee) }}</strong>
-                <span>{{ shortId(empId(employee)) }}</span>
-              </td>
-              <td>{{ employee.email || employee.Email || '—' }}</td>
-              <td>{{ employee.departmentName || employee.DepartmentName || 'Chưa phân bổ' }}</td>
               <td>
-                <span class="pill" :class="(employee.status || employee.Status || 'Active') === 'Active' ? 'success' : 'neutral'">
-                  {{ employee.status || employee.Status || 'Active' }}
+                <strong>{{ empCode(employee) }}</strong>
+              </td>
+
+              <td class="name-cell">
+                <strong>{{ empName(employee) }}</strong>
+              </td>
+
+              <td>{{ employee.email || employee.Email || '—' }}</td>
+
+              <td>
+                {{ employee.departmentName || employee.DepartmentName || 'Chưa phân bổ' }}
+              </td>
+
+              <td>
+                <span class="pill" :class="statusClass(employee.status || employee.Status || 'Active')">
+                  {{ statusText(employee.status || employee.Status || 'Active') }}
                 </span>
               </td>
+
               <td>
-                <div class="actions">
-                  <button class="btn small" @click="openEdit(employee)">Sửa</button>
-                  <button class="btn small danger" @click="removeEmployee(employee)">Xóa</button>
+                <div class="actions right">
+                  <button class="icon-action" title="Sửa" @click="openEdit(employee)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0 0-3L17.5 5.5a2.1 2.1 0 0 0-3 0L4 16v4Z"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+
+                  <button class="icon-action danger" title="Xóa" @click="removeEmployee(employee)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M6 7h12M10 11v6M14 11v6M9 7l1-3h4l1 3M8 7l1 13h6l1-13"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
                 </div>
               </td>
             </tr>
+
             <tr v-if="!employees.length">
-              <td colspan="6" class="empty">Chưa có dữ liệu nhân viên.</td>
+              <td colspan="6" class="empty">Không có dữ liệu.</td>
             </tr>
           </tbody>
         </table>
@@ -67,9 +176,14 @@
         <div class="modal-head">
           <div>
             <h2>{{ editingId ? 'Sửa nhân viên' : 'Thêm nhân viên' }}</h2>
-            <p class="modal-subtitle">Lưu hồ sơ trước, tài khoản sẽ gắn đúng EmployeeId của nhân viên.</p>
+            <p class="modal-subtitle">
+              Lưu hồ sơ trước, tài khoản sẽ gắn đúng EmployeeId của nhân viên.
+            </p>
           </div>
-          <button class="btn ghost" @click="showModal = false">Đóng</button>
+
+          <button class="btn ghost" @click="showModal = false">
+            Đóng
+          </button>
         </div>
 
         <div class="section-box">
@@ -81,33 +195,46 @@
           <div class="form-grid">
             <div class="form-field">
               <label>Mã nhân viên</label>
-              <input v-model.trim="form.employeeCode" :disabled="!!editingId" placeholder="Để trống: NV01, NV02..." />
+              <input
+                v-model.trim="form.employeeCode"
+                :disabled="!!editingId"
+                placeholder="Để trống: NV01, NV02..."
+              />
             </div>
+
             <div class="form-field">
               <label>Họ tên</label>
               <input v-model.trim="form.fullName" placeholder="Nguyễn Văn A" />
             </div>
+
             <div class="form-field">
               <label>Email</label>
               <input v-model.trim="form.email" placeholder="email@company.com" />
             </div>
+
             <div class="form-field">
               <label>Phòng ban</label>
               <select v-model="form.departmentId">
                 <option value="">Chưa phân bổ</option>
-                <option v-for="dept in departments" :key="dept.departmentId" :value="dept.departmentId">
+                <option
+                  v-for="dept in departments"
+                  :key="dept.departmentId"
+                  :value="dept.departmentId"
+                >
                   {{ dept.departmentName }}
                 </option>
               </select>
             </div>
+
             <div class="form-field">
               <label>Trạng thái</label>
               <select v-model="form.status">
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Probation">Probation</option>
+                <option value="Active">Đang làm</option>
+                <option value="Inactive">Nghỉ việc</option>
+                <option value="Probation">Thử việc</option>
               </select>
             </div>
+
             <div class="form-field">
               <label>Face ID</label>
               <input v-model.trim="form.faceFeatures" placeholder="Tùy chọn" />
@@ -117,10 +244,11 @@
 
         <div class="section-box">
           <div class="section-head">
-            <h3>Cấp tài khoản hệ thống</h3>
+            <h3>Tài khoản hệ thống</h3>
+
             <label class="switch-row">
               <input v-model="form.createAccount" type="checkbox" />
-              <span>{{ editingId ? 'Tạo tài khoản cho nhân viên này' : 'Tạo tài khoản ngay' }}</span>
+              <span>{{ editingId ? 'Tạo tài khoản' : 'Tạo ngay' }}</span>
             </label>
           </div>
 
@@ -129,6 +257,7 @@
               <label>Tên đăng nhập</label>
               <input v-model.trim="form.username" placeholder="vd: hoainam_hr" />
             </div>
+
             <div class="form-field">
               <label>Vai trò</label>
               <select v-model="form.role">
@@ -137,10 +266,12 @@
                 <option v-if="canCreateAdmin" value="Admin">Admin</option>
               </select>
             </div>
+
             <div class="form-field">
               <label>Mật khẩu</label>
               <input v-model="form.password" type="password" placeholder="Ít nhất 6 ký tự" />
             </div>
+
             <div class="form-field">
               <label>Nhập lại mật khẩu</label>
               <input v-model="form.confirmPassword" type="password" placeholder="Nhập lại mật khẩu" />
@@ -149,7 +280,10 @@
         </div>
 
         <div class="modal-foot">
-          <button class="btn ghost" @click="showModal = false">Hủy</button>
+          <button class="btn ghost" @click="showModal = false">
+            Hủy
+          </button>
+
           <button class="btn primary" @click="saveEmployee">
             {{ editingId ? 'Lưu thay đổi' : 'Lưu nhân viên' }}
           </button>
@@ -160,7 +294,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { authApi, hrApi, unwrapEmployees } from '../services/api'
 import { isAdmin } from '../services/auth'
 
@@ -171,8 +305,15 @@ const showModal = ref(false)
 const editingId = ref('')
 const message = ref('')
 const messageType = ref('')
+const showDepartmentFilter = ref(false)
 
-const filters = reactive({ search: '', departmentId: '' })
+let searchTimer = null
+
+const filters = reactive({
+  search: '',
+  departmentId: '',
+})
+
 const form = reactive({
   employeeCode: '',
   fullName: '',
@@ -192,16 +333,43 @@ const canCreateAdmin = computed(() => isAdmin())
 function empId(emp = {}) {
   return emp.employeeId || emp.EmployeeId || emp.id || emp.Id || ''
 }
+
 function empCode(emp = {}) {
   return emp.employeeCode || emp.EmployeeCode || emp.code || '—'
 }
+
 function empName(emp = {}) {
   return emp.fullName || emp.FullName || emp.name || '—'
 }
 
-function shortId(value = '') {
-  const text = String(value || '')
-  return text.length > 14 ? `${text.slice(0, 8)}...` : text || '—'
+function statusText(status = 'Active') {
+  const map = {
+    Active: 'Đang làm',
+    Inactive: 'Nghỉ việc',
+    Probation: 'Thử việc',
+  }
+
+  return map[status] || status
+}
+
+function statusClass(status = 'Active') {
+  if (status === 'Active') return 'success'
+  if (status === 'Probation') return 'warning'
+  return 'neutral'
+}
+
+function scheduleSearch() {
+  clearTimeout(searchTimer)
+
+  searchTimer = setTimeout(() => {
+    loadEmployees()
+  }, 350)
+}
+
+function selectDepartment(departmentId) {
+  filters.departmentId = departmentId
+  showDepartmentFilter.value = false
+  loadEmployees()
 }
 
 function resetForm() {
@@ -218,12 +386,14 @@ function resetForm() {
     confirmPassword: '',
     role: 'Employee',
   })
+
   editingId.value = ''
 }
 
 function notify(text, type = 'success') {
   message.value = text
   messageType.value = type
+
   setTimeout(() => {
     message.value = ''
   }, 4200)
@@ -231,11 +401,16 @@ function notify(text, type = 'success') {
 
 function nextEmployeeCode() {
   let max = 0
+
   employees.value.forEach((emp) => {
     const code = String(empCode(emp)).toUpperCase()
     const match = code.match(/^NV0*(\d+)$/)
-    if (match) max = Math.max(max, Number(match[1]))
+
+    if (match) {
+      max = Math.max(max, Number(match[1]))
+    }
   })
+
   return `NV${String(max + 1).padStart(2, '0')}`
 }
 
@@ -267,8 +442,10 @@ async function loadDepartments() {
 
 function saveEmployeeDirectory(list = []) {
   const directory = {}
+
   list.forEach((emp) => {
     const id = empId(emp)
+
     if (id) {
       directory[id] = {
         employeeCode: empCode(emp),
@@ -276,11 +453,13 @@ function saveEmployeeDirectory(list = []) {
       }
     }
   })
+
   localStorage.setItem('hrm_employee_directory_v13', JSON.stringify(directory))
 }
 
 async function loadEmployees() {
   loading.value = true
+
   try {
     const response = await hrApi.employees.list(filters)
     employees.value = unwrapEmployees(response)
@@ -299,13 +478,19 @@ function openCreate() {
 
 function openEdit(employee) {
   editingId.value = empId(employee)
+
   Object.assign(form, {
     employeeCode: empCode(employee) === '—' ? '' : empCode(employee),
     fullName: empName(employee) === '—' ? '' : empName(employee),
     email: employee.email || employee.Email || '',
     status: employee.status || employee.Status || 'Active',
     departmentId:
-      employee.departmentId || employee.DepartmentId || departments.value.find((d) => d.departmentName === (employee.departmentName || employee.DepartmentName))?.departmentId || '',
+      employee.departmentId ||
+      employee.DepartmentId ||
+      departments.value.find(
+        (d) => d.departmentName === (employee.departmentName || employee.DepartmentName)
+      )?.departmentId ||
+      '',
     faceFeatures: employee.faceFeatures || employee.FaceFeatures || '',
     createAccount: false,
     username: '',
@@ -313,31 +498,55 @@ function openEdit(employee) {
     confirmPassword: '',
     role: 'Employee',
   })
+
   showModal.value = true
 }
 
 function validateForm() {
-  if (!form.fullName.trim()) return 'Họ tên không được để trống.'
-  if (form.createAccount) {
-    if (!form.username.trim()) return 'Vui lòng nhập tên đăng nhập.'
-    if (!form.password) return 'Vui lòng nhập mật khẩu.'
-    if (form.password.length < 6) return 'Mật khẩu phải có ít nhất 6 ký tự.'
-    if (form.password !== form.confirmPassword) return 'Mật khẩu nhập lại không khớp.'
-    if (!canCreateAdmin.value && form.role !== 'Employee') return 'HR chỉ được tạo tài khoản Employee.'
+  if (!form.fullName.trim()) {
+    return 'Họ tên không được để trống.'
   }
+
+  if (form.createAccount) {
+    if (!form.username.trim()) {
+      return 'Vui lòng nhập tên đăng nhập.'
+    }
+
+    if (!form.password) {
+      return 'Vui lòng nhập mật khẩu.'
+    }
+
+    if (form.password.length < 6) {
+      return 'Mật khẩu phải có ít nhất 6 ký tự.'
+    }
+
+    if (form.password !== form.confirmPassword) {
+      return 'Mật khẩu nhập lại không khớp.'
+    }
+
+    if (!canCreateAdmin.value && form.role !== 'Employee') {
+      return 'HR chỉ được tạo tài khoản Employee.'
+    }
+  }
+
   return ''
 }
 
 function extractCreatedEmployeeId(response) {
   const data = response?.data || response?.Data || response?.data?.data || response?.Data?.Data || response
+
   return data?.employeeId || data?.EmployeeId || data?.data?.employeeId || data?.Data?.EmployeeId || ''
 }
 
 async function saveEmployee() {
   const validationError = validateForm()
-  if (validationError) return notify(validationError, 'error')
+
+  if (validationError) {
+    return notify(validationError, 'error')
+  }
 
   loading.value = true
+
   try {
     if (editingId.value) {
       await hrApi.employees.update(editingId.value, baseEmployeePayload())
@@ -353,7 +562,10 @@ async function saveEmployee() {
       const employeeId = extractCreatedEmployeeId(createdResponse)
 
       if (form.createAccount) {
-        if (!employeeId) throw new Error('API tạo nhân viên không trả EmployeeId để cấp tài khoản.')
+        if (!employeeId) {
+          throw new Error('API tạo nhân viên không trả EmployeeId để cấp tài khoản.')
+        }
+
         try {
           await authApi.register(accountPayload(employeeId))
         } catch (error) {
@@ -375,8 +587,12 @@ async function saveEmployee() {
 }
 
 async function removeEmployee(employee) {
-  if (!confirm(`Xóa nhân viên ${empCode(employee)} - ${empName(employee)}?`)) return
+  if (!confirm(`Xóa nhân viên ${empCode(employee)} - ${empName(employee)}?`)) {
+    return
+  }
+
   loading.value = true
+
   try {
     await hrApi.employees.remove(empId(employee))
     notify('Đã xóa nhân viên.')
@@ -392,4 +608,221 @@ onMounted(async () => {
   await loadDepartments().catch(() => {})
   await loadEmployees()
 })
+
+onUnmounted(() => {
+  clearTimeout(searchTimer)
+})
 </script>
+
+<style scoped>
+.employee-card {
+  padding: 20px;
+}
+
+.employee-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.employee-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.employee-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 14px;
+}
+
+.search-group {
+  width: min(420px, 100%);
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-group input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 14px;
+  outline: none;
+  transition: 0.2s ease;
+}
+
+.search-group input::placeholder {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.search-group input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.filter-box {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.filter-btn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.filter-btn:hover,
+.filter-btn.active {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.filter-popover {
+  position: absolute;
+  top: 52px;
+  left: 0;
+  width: 240px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
+  z-index: 30;
+}
+
+.filter-option {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #334155;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.filter-option:hover,
+.filter-option.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.add-btn {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+  transition: 0.2s ease;
+}
+
+.add-btn:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.name-cell strong {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.actions.right {
+  justify-content: flex-end;
+}
+
+.icon-action {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.icon-action:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.icon-action.danger {
+  border-color: #fee2e2;
+  background: #fff7f7;
+  color: #dc2626;
+}
+
+.icon-action.danger:hover {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.pill.warning {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+@media (max-width: 768px) {
+  .employee-card {
+    padding: 16px;
+  }
+
+  .employee-head {
+    align-items: center;
+  }
+
+  .search-group {
+    width: 100%;
+  }
+
+  .filter-popover {
+    right: 0;
+    left: auto;
+  }
+}
+</style>

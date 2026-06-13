@@ -18,25 +18,98 @@
         <span class="pill neutral">{{ myEmployeeLabel }}</span>
       </div>
 
-      <div class="face-layout">
-        <div class="face-box">
-          <video v-if="camera.active && !facePreview" ref="videoRef" autoplay muted playsinline></video>
-          <img v-else-if="facePreview" :src="facePreview" alt="Ảnh xác thực khuôn mặt" />
-          <div v-else class="face-placeholder">
-            <span>📷</span>
-            <strong>Camera chưa bật</strong>
-            <small>Dùng camera để xác thực khuôn mặt.</small>
+      <div class="camera-workspace">
+        <div class="camera-main">
+          <div
+            class="camera-viewport"
+            :class="{
+              'is-active': camera.active && !facePreview,
+              'has-preview': !!facePreview,
+              'has-error': !!camera.error,
+            }"
+          >
+            <video
+              v-if="camera.active && !facePreview"
+              ref="videoRef"
+              autoplay
+              muted
+              playsinline
+              @loadedmetadata="handleCameraReady"
+            ></video>
+
+            <img
+              v-else-if="facePreview"
+              :src="facePreview"
+              alt="Ảnh xác thực khuôn mặt"
+            />
+
+            <div v-else class="camera-placeholder">
+              <div class="camera-placeholder-icon" aria-hidden="true">📷</div>
+              <strong>Camera chưa bật</strong>
+              <small>Nhấn “Bật camera” để bắt đầu xác thực khuôn mặt.</small>
+            </div>
+
+            <div v-if="camera.active && !facePreview" class="face-guide" aria-hidden="true">
+              <span class="face-guide-oval"></span>
+              <span class="guide-corner top-left"></span>
+              <span class="guide-corner top-right"></span>
+              <span class="guide-corner bottom-left"></span>
+              <span class="guide-corner bottom-right"></span>
+            </div>
+
+            <div class="camera-status" :class="cameraStatusClass">
+              <span class="status-dot"></span>
+              {{ cameraStatusText }}
+            </div>
           </div>
-          <canvas ref="canvasRef" width="420" height="280" hidden></canvas>
+
+          <canvas ref="canvasRef" width="720" height="540" hidden></canvas>
+
+          <div class="camera-hints">
+            <span>Đặt khuôn mặt ở giữa khung</span>
+            <span>Giữ khoảng cách khoảng 40–70 cm</span>
+            <span>Đảm bảo khuôn mặt đủ sáng</span>
+          </div>
         </div>
 
-        <div class="face-actions">
-          <button class="btn ghost" @click="startCamera">Bật camera</button>
-          <button class="btn warning" :disabled="!camera.active" @click="captureFace">Chụp mặt</button>
-          <button class="btn success" :disabled="!canSubmitFace" @click="faceCheckIn">Face check-in</button>
-          <button class="btn primary" :disabled="!canSubmitFace" @click="faceCheckOut">Face check-out</button>
-          <button class="btn ghost" @click="resetFace">Làm lại</button>
-        </div>
+        <aside class="camera-control-panel">
+          <div class="camera-employee">
+            <span class="camera-employee-label">Nhân viên đang chấm công</span>
+            <strong>{{ myEmployeeLabel }}</strong>
+          </div>
+
+          <div class="camera-instruction">
+            <strong>{{ facePreview ? 'Ảnh đã sẵn sàng' : 'Hướng dẫn' }}</strong>
+            <p v-if="facePreview">
+              Kiểm tra ảnh rõ mặt trước khi thực hiện check-in hoặc check-out.
+            </p>
+            <p v-else>
+              Bật camera, nhìn thẳng vào khung hướng dẫn rồi nhấn chụp mặt.
+            </p>
+          </div>
+
+          <div class="face-actions">
+            <button class="btn ghost" :disabled="camera.active" @click="startCamera">
+              Bật camera
+            </button>
+            <button class="btn warning" :disabled="!camera.ready || !!facePreview" @click="captureFace">
+              Chụp mặt
+            </button>
+            <button class="btn success" :disabled="!canSubmitFace" @click="faceCheckIn">
+              Face check-in
+            </button>
+            <button class="btn primary" :disabled="!canSubmitFace" @click="faceCheckOut">
+              Face check-out
+            </button>
+            <button class="btn ghost camera-action-wide" @click="retakeFace">
+              {{ facePreview ? 'Chụp lại ảnh' : 'Làm mới camera' }}
+            </button>
+          </div>
+
+          <small class="camera-note">
+            Ảnh chỉ được dùng cho bước xác thực chấm công hiện tại.
+          </small>
+        </aside>
       </div>
     </article>
 
@@ -227,7 +300,7 @@ const calendarEmployeeId = ref('')
 const videoRef = ref(null)
 const canvasRef = ref(null)
 const facePreview = ref('')
-const camera = reactive({ active: false, stream: null })
+const camera = reactive({ active: false, ready: false, stream: null, error: '' })
 
 const authUser = computed(() => getAuthUser())
 const canManage = computed(() => canManageAttendance())
@@ -239,6 +312,19 @@ const myEmployeeLabel = computed(() => {
   return `${code} - ${name}`
 })
 const canSubmitFace = computed(() => !!myEmployeeId.value && !!facePreview.value)
+const cameraStatusText = computed(() => {
+  if (facePreview.value) return 'Đã chụp ảnh'
+  if (camera.error) return 'Camera gặp lỗi'
+  if (camera.ready) return 'Camera sẵn sàng'
+  if (camera.active) return 'Đang khởi động camera'
+  return 'Camera đang tắt'
+})
+const cameraStatusClass = computed(() => {
+  if (facePreview.value) return 'success'
+  if (camera.error) return 'error'
+  if (camera.ready) return 'live'
+  return 'idle'
+})
 
 const filteredRecords = computed(() => {
   const employeeId = isSelfService.value ? myEmployeeId.value : calendarEmployeeId.value
@@ -485,30 +571,132 @@ async function loadAll() {
 }
 
 async function startCamera() {
+  stopCamera()
+  facePreview.value = ''
+  camera.error = ''
+
   try {
-    camera.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Trình duyệt không hỗ trợ truy cập camera.')
+    }
+
+    camera.stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 960 },
+        aspectRatio: { ideal: 4 / 3 },
+      },
+      audio: false,
+    })
+
     camera.active = true
-    facePreview.value = ''
     await nextTick()
-    if (videoRef.value) videoRef.value.srcObject = camera.stream
-  } catch {
-    notify('Không mở được camera.', 'error')
+
+    if (!videoRef.value) {
+      throw new Error('Không tìm thấy vùng hiển thị camera.')
+    }
+
+    videoRef.value.srcObject = camera.stream
+
+    try {
+      await videoRef.value.play()
+    } catch {
+      // Thuộc tính autoplay sẽ tiếp tục xử lý trên các trình duyệt hỗ trợ.
+    }
+
+    if (videoRef.value.readyState >= 2) handleCameraReady()
+  } catch (error) {
+    stopCamera()
+    camera.error = error?.message || 'Không thể truy cập camera.'
+    notify('Không mở được camera. Hãy kiểm tra quyền camera của trình duyệt.', 'error')
   }
 }
+
+function handleCameraReady() {
+  camera.ready = true
+  camera.error = ''
+}
+
 function captureFace() {
-  if (!videoRef.value || !canvasRef.value) return
-  const context = canvasRef.value.getContext('2d')
-  context.drawImage(videoRef.value, 0, 0, canvasRef.value.width, canvasRef.value.height)
-  facePreview.value = canvasRef.value.toDataURL('image/jpeg', 0.86)
+  const video = videoRef.value
+  const canvas = canvasRef.value
+
+  if (!video || !canvas || !camera.ready) {
+    return notify('Camera chưa sẵn sàng để chụp.', 'error')
+  }
+
+  const sourceWidth = video.videoWidth
+  const sourceHeight = video.videoHeight
+
+  if (!sourceWidth || !sourceHeight) {
+    return notify('Chưa nhận được hình ảnh từ camera.', 'error')
+  }
+
+  const targetWidth = 720
+  const targetHeight = 540
+  const targetRatio = targetWidth / targetHeight
+  const sourceRatio = sourceWidth / sourceHeight
+
+  let sourceX = 0
+  let sourceY = 0
+  let cropWidth = sourceWidth
+  let cropHeight = sourceHeight
+
+  // Crop từ tâm để ảnh không bị kéo méo khi camera trả về tỉ lệ khác 4:3.
+  if (sourceRatio > targetRatio) {
+    cropWidth = sourceHeight * targetRatio
+    sourceX = (sourceWidth - cropWidth) / 2
+  } else if (sourceRatio < targetRatio) {
+    cropHeight = sourceWidth / targetRatio
+    sourceY = (sourceHeight - cropHeight) / 2
+  }
+
+  canvas.width = targetWidth
+  canvas.height = targetHeight
+
+  const context = canvas.getContext('2d')
+  if (!context) return notify('Không thể xử lý ảnh camera.', 'error')
+
+  context.save()
+  context.clearRect(0, 0, targetWidth, targetHeight)
+
+  // Lật ảnh giống phần xem trước để người dùng không thấy ảnh bị đảo chiều sau khi chụp.
+  context.translate(targetWidth, 0)
+  context.scale(-1, 1)
+  context.drawImage(
+    video,
+    sourceX,
+    sourceY,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    targetWidth,
+    targetHeight,
+  )
+  context.restore()
+
+  facePreview.value = canvas.toDataURL('image/jpeg', 0.9)
   stopCamera()
 }
+
 function resetFace() {
   facePreview.value = ''
+  camera.error = ''
 }
+
+async function retakeFace() {
+  resetFace()
+  await startCamera()
+}
+
 function stopCamera() {
   if (camera.stream) camera.stream.getTracks().forEach((track) => track.stop())
+  if (videoRef.value) videoRef.value.srcObject = null
   camera.stream = null
   camera.active = false
+  camera.ready = false
 }
 async function verifyFacePhoto() {
   if (!facePreview.value) throw new Error('Bạn cần chụp mặt trước khi chấm công.')
@@ -613,3 +801,417 @@ function exportExcel() {
 onMounted(loadAll)
 onBeforeUnmount(stopCamera)
 </script>
+
+<style scoped>
+.face-attendance-card {
+  overflow: hidden;
+}
+
+.camera-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.7fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-top: 18px;
+}
+
+.camera-main {
+  min-width: 0;
+}
+
+.camera-viewport {
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  aspect-ratio: 4 / 3;
+  min-height: 300px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.38);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(51, 65, 85, 0.88), rgba(15, 23, 42, 0.98) 62%),
+    #0f172a;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+  isolation: isolate;
+}
+
+.camera-viewport::after {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: inherit;
+  pointer-events: none;
+  content: '';
+}
+
+.camera-viewport video,
+.camera-viewport img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+
+.camera-viewport video {
+  transform: scaleX(-1);
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+.camera-placeholder-icon {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 4px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 34px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.camera-placeholder strong {
+  font-size: 1.05rem;
+}
+
+.camera-placeholder small {
+  max-width: 340px;
+  color: #94a3b8;
+  line-height: 1.55;
+}
+
+.face-guide {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.face-guide-oval {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(170px, 38%, 275px);
+  height: clamp(235px, 64%, 390px);
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 999px rgba(2, 6, 23, 0.28),
+    0 0 28px rgba(255, 255, 255, 0.15);
+  transform: translate(-50%, -50%);
+}
+
+.guide-corner {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  border-color: #60a5fa;
+  border-style: solid;
+}
+
+.guide-corner.top-left {
+  top: 22px;
+  left: 22px;
+  border-width: 3px 0 0 3px;
+  border-radius: 12px 0 0;
+}
+
+.guide-corner.top-right {
+  top: 22px;
+  right: 22px;
+  border-width: 3px 3px 0 0;
+  border-radius: 0 12px 0 0;
+}
+
+.guide-corner.bottom-left {
+  bottom: 22px;
+  left: 22px;
+  border-width: 0 0 3px 3px;
+  border-radius: 0 0 0 12px;
+}
+
+.guide-corner.bottom-right {
+  right: 22px;
+  bottom: 22px;
+  border-width: 0 3px 3px 0;
+  border-radius: 0 0 12px;
+}
+
+.camera-status {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #94a3b8;
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.16);
+}
+
+.camera-status.live .status-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+  animation: camera-pulse 1.8s infinite;
+}
+
+.camera-status.success .status-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
+}
+
+.camera-status.error .status-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
+}
+
+.camera-hints {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.camera-hints span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--surface-soft, #f8fafc);
+  color: var(--muted, #64748b);
+  font-size: 0.76rem;
+  line-height: 1.2;
+}
+
+.camera-hints span::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #3b82f6;
+  content: '';
+}
+
+.camera-control-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 20px;
+  background: var(--surface-soft, #f8fafc);
+}
+
+.camera-employee {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.camera-employee-label {
+  color: var(--muted, #64748b);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.camera-employee strong {
+  overflow-wrap: anywhere;
+  color: var(--text, #0f172a);
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.camera-instruction {
+  padding: 14px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  border-radius: 14px;
+  background: rgba(59, 130, 246, 0.07);
+}
+
+.camera-instruction strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text, #0f172a);
+  font-size: 0.88rem;
+}
+
+.camera-instruction p {
+  margin: 0;
+  color: var(--muted, #64748b);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.face-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: auto;
+}
+
+.face-actions .btn {
+  width: 100%;
+  min-height: 42px;
+  padding-inline: 12px;
+  white-space: normal;
+}
+
+.camera-action-wide {
+  grid-column: 1 / -1;
+}
+
+.camera-note {
+  display: block;
+  color: var(--muted, #64748b);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@keyframes camera-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (max-width: 980px) {
+  .camera-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-control-panel {
+    width: 100%;
+  }
+
+  .face-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .camera-action-wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .camera-workspace {
+    gap: 16px;
+  }
+
+  .camera-viewport {
+    min-height: 0;
+    border-radius: 16px;
+  }
+
+  .camera-control-panel {
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .face-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .camera-action-wide {
+    grid-column: 1 / -1;
+  }
+
+  .camera-hints {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 460px) {
+  .camera-status {
+    top: 10px;
+    left: 10px;
+    max-width: calc(100% - 20px);
+    padding: 7px 10px;
+  }
+
+  .face-guide-oval {
+    width: 42%;
+    height: 66%;
+  }
+
+  .guide-corner {
+    width: 28px;
+    height: 28px;
+  }
+
+  .guide-corner.top-left {
+    top: 14px;
+    left: 14px;
+  }
+
+  .guide-corner.top-right {
+    top: 14px;
+    right: 14px;
+  }
+
+  .guide-corner.bottom-left {
+    bottom: 14px;
+    left: 14px;
+  }
+
+  .guide-corner.bottom-right {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .face-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-action-wide {
+    grid-column: auto;
+  }
+}
+</style>
