@@ -1,0 +1,124 @@
+{
+  "global-configs": {
+    "insuranceRate": 10.5,
+    "personalDeduction": 11000000,
+    "dependentDeduction": 4400000,
+    "progressiveTaxTiers": [
+      {
+        "tier": 1,
+        "minIncome": 0,
+        "maxIncome": 5000000,
+        "rate": 5
+      },
+      {
+        "tier": 2,
+        "minIncome": 5000000,
+        "maxIncome": 10000000,
+        "rate": 10
+      },
+      {
+        "tier": 3,
+        "minIncome": 10000000,
+        "maxIncome": 18000000,
+        "rate": 15
+      },
+      {
+        "tier": 4,
+        "minIncome": 18000000,
+        "maxIncome": 32000000,
+        "rate": 20
+      },
+      {
+        "tier": 5,
+        "minIncome": 32000000,
+        "maxIncome": 52000000,
+        "rate": 25
+      },
+      {
+        "tier": 6,
+        "minIncome": 52000000,
+        "maxIncome": 80000000,
+        "rate": 30
+      },
+      {
+        "tier": 7,
+        "minIncome": 80000000,
+        "maxIncome": null,
+        "rate": 35
+      }
+    ]
+  },
+  "salary-configs": [
+    {
+      "id": "CFG_IT",
+      "department": "IT",
+      "baseSalary": 18000000,
+      "lunchAllowance": 800000,
+      "transportAllowance": 500000,
+      "laptopAllowance": 1000000,
+      "updatedAt": "2026-05-01"
+    },
+    {
+      "id": "CFG_MKT",
+      "department": "Marketing",
+      "baseSalary": 14000000,
+      "lunchAllowance": 800000,
+      "transportAllowance": 800000,
+      "phoneAllowance": 500000,
+      "updatedAt": "2026-05-01"
+    }
+  ],
+  "payrolls": [
+    {
+      "id": "PR_202604_001",
+      "employeeId": "NV001",
+      "employeeName": "Nguyễn Văn A",
+      "department": "IT",
+      "month": "2026-04",
+      "standardDays": 22,
+      "actualDays": 22,
+      "totalAllowance": 2300000,
+      "insuranceDeduction": 1890000,
+      "taxDeduction": 491000,
+      "netSalary": 17919000,
+      "status": "Approved",
+      "gmail": "a@gmail.com"
+    },
+    {
+      "id": "PR_202604_002",
+      "employeeId": "NV002",
+      "employeeName": "Trần Thị B",
+      "department": "Marketing",
+      "month": "2026-04",
+      "standardDays": 22,
+      "actualDays": 20,
+      "totalAllowance": 2100000,
+      "insuranceDeduction": 1336364,
+      "taxDeduction": 124545,
+      "netSalary": 13366364,
+      "status": "Pending"
+    },
+    {
+      "id": "rfn8AmSnyZg",
+      "employeeId": "nv003",
+      "employeeName": "Bạch Ngọc Lương",
+      "gmail": "bachngocluong2005@gmail.com",
+      "department": "IT",
+      "month": "2026-04",
+      "standardDays": 22,
+      "actualDays": 22,
+      "totalAllowance": 2300000,
+      "insuranceDeduction": 1890000,
+      "taxDeduction": 491000,
+      "netSalary": 17919000,
+      "status": "Pending"
+    }
+  ],
+  "dashboard-summary": {
+    "month": "2026-04",
+    "totalEmployees": 150,
+    "totalPayrollCost": 2500000000,
+    "averageSalary": 16666667
+  },
+  "$schema": "./node_modules/json-server/schema.json"
+}
