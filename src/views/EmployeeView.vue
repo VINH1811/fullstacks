@@ -5,100 +5,100 @@
     </div>
 
     <article class="card employee-card">
-    <div class="employee-head">
-  <h2>Nhân viên</h2>
-</div>
+      <div class="employee-head">
+        <h2>Nhân viên</h2>
+      </div>
 
-<div class="employee-tools">
-  <div class="search-group">
-    <input
-      v-model.trim="filters.search"
-      placeholder="Tìm theo mã NV"
-      @input="scheduleSearch"
-      @keyup.enter="loadEmployees"
-    />
-
-    <div class="filter-box">
-      <button
-        class="filter-btn"
-        :class="{ active: filters.departmentId || filters.status }"
-        title="Bộ lọc"
-        @click="showDepartmentFilter = !showDepartmentFilter"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M4 6h16M7 12h10M10 18h4"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
+      <div class="employee-tools">
+        <div class="search-group">
+          <input
+            v-model.trim="filters.search"
+            placeholder="Tìm theo mã NV"
+            @input="scheduleSearch"
+            @keyup.enter="loadEmployees"
           />
-        </svg>
-      </button>
 
-      <div v-if="showDepartmentFilter" class="filter-popover">
-        <div class="filter-title">Phòng ban</div>
+          <div ref="filterBoxRef" class="filter-box">
+            <button
+              class="filter-btn"
+              :class="{ active: filters.departmentId || filters.status }"
+              title="Bộ lọc"
+              @click="showDepartmentFilter = !showDepartmentFilter"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 6h16M7 12h10M10 18h4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
 
-        <button
-          class="filter-option"
-          :class="{ active: !filters.departmentId }"
-          @click="selectDepartment('')"
-        >
-          Tất cả phòng ban
-        </button>
+            <div v-if="showDepartmentFilter" class="filter-popover">
+              <div class="filter-title">Phòng ban</div>
 
-        <button
-          v-for="dept in departments"
-          :key="dept.departmentId"
-          class="filter-option"
-          :class="{ active: filters.departmentId === dept.departmentId }"
-          @click="selectDepartment(dept.departmentId)"
-        >
-          {{ dept.departmentName }}
-        </button>
+              <button
+                class="filter-option"
+                :class="{ active: !filters.departmentId }"
+                @click="selectDepartment('')"
+              >
+                Tất cả phòng ban
+              </button>
 
-        <div class="filter-divider"></div>
+              <button
+                v-for="dept in departments"
+                :key="dept.departmentId"
+                class="filter-option"
+                :class="{ active: filters.departmentId === dept.departmentId }"
+                @click="selectDepartment(dept.departmentId)"
+              >
+                {{ dept.departmentName }}
+              </button>
 
-        <div class="filter-title">Trạng thái</div>
+              <div class="filter-divider"></div>
 
-        <button
-          class="filter-option"
-          :class="{ active: !filters.status }"
-          @click="selectStatus('')"
-        >
-          Tất cả trạng thái
-        </button>
+              <div class="filter-title">Trạng thái</div>
 
-        <button
-          class="filter-option"
-          :class="{ active: filters.status === 'Active' }"
-          @click="selectStatus('Active')"
-        >
-          Đang làm
-        </button>
+              <button
+                class="filter-option"
+                :class="{ active: !filters.status }"
+                @click="selectStatus('')"
+              >
+                Tất cả trạng thái
+              </button>
 
-        <button
-          class="filter-option"
-          :class="{ active: filters.status === 'Probation' }"
-          @click="selectStatus('Probation')"
-        >
-          Thử việc
-        </button>
+              <button
+                class="filter-option"
+                :class="{ active: filters.status === 'Active' }"
+                @click="selectStatus('Active')"
+              >
+                Đang làm
+              </button>
 
-        <button
-          class="filter-option"
-          :class="{ active: filters.status === 'Inactive' }"
-          @click="selectStatus('Inactive')"
-        >
-          Nghỉ việc
+              <button
+                class="filter-option"
+                :class="{ active: filters.status === 'Probation' }"
+                @click="selectStatus('Probation')"
+              >
+                Thử việc
+              </button>
+
+              <button
+                class="filter-option"
+                :class="{ active: filters.status === 'Inactive' }"
+                @click="selectStatus('Inactive')"
+              >
+                Nghỉ việc
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button class="add-btn" title="Thêm nhân viên" @click="openCreate">
+          +
         </button>
       </div>
-    </div>
-  </div>
-
-  <button class="add-btn" title="Thêm nhân viên" @click="openCreate">
-    +
-  </button>
-</div>
 
       <div class="table-wrap">
         <table>
@@ -123,7 +123,9 @@
                 <strong>{{ empName(employee) }}</strong>
               </td>
 
-              <td>{{ employee.email || employee.Email || '—' }}</td>
+              <td>
+                {{ employee.email || employee.Email || '—' }}
+              </td>
 
               <td>
                 {{ employee.departmentName || employee.DepartmentName || 'Chưa phân bổ' }}
@@ -306,12 +308,14 @@ const editingId = ref('')
 const message = ref('')
 const messageType = ref('')
 const showDepartmentFilter = ref(false)
+const filterBoxRef = ref(null)
 
 let searchTimer = null
 
 const filters = reactive({
   search: '',
   departmentId: '',
+  status: '',
 })
 
 const form = reactive({
@@ -372,6 +376,20 @@ function selectDepartment(departmentId) {
   loadEmployees()
 }
 
+function selectStatus(status) {
+  filters.status = status
+  showDepartmentFilter.value = false
+  loadEmployees()
+}
+function handleOutsideFilterClick(event) {
+  if (!showDepartmentFilter.value) return
+
+  const target = event.target
+
+  if (filterBoxRef.value && !filterBoxRef.value.contains(target)) {
+    showDepartmentFilter.value = false
+  }
+}
 function resetForm() {
   Object.assign(form, {
     employeeCode: '',
@@ -461,8 +479,22 @@ async function loadEmployees() {
   loading.value = true
 
   try {
-    const response = await hrApi.employees.list(filters)
-    employees.value = unwrapEmployees(response)
+    const query = {
+      search: filters.search,
+      departmentId: filters.departmentId,
+    }
+
+    const response = await hrApi.employees.list(query)
+    let list = unwrapEmployees(response)
+
+    if (filters.status) {
+      list = list.filter((employee) => {
+        const status = employee.status || employee.Status || 'Active'
+        return status === filters.status
+      })
+    }
+
+    employees.value = list
     saveEmployeeDirectory(employees.value)
   } catch (error) {
     notify(error.message || 'Không tải được danh sách nhân viên.', 'error')
@@ -605,73 +637,81 @@ async function removeEmployee(employee) {
 }
 
 onMounted(async () => {
+  document.addEventListener('click', handleOutsideFilterClick)
+
   await loadDepartments().catch(() => {})
   await loadEmployees()
 })
 
 onUnmounted(() => {
   clearTimeout(searchTimer)
+  document.removeEventListener('click', handleOutsideFilterClick)
 })
 </script>
 
 <style scoped>
 .employee-card {
-  padding: 20px;
+  width: 100%;
+  padding: 28px 32px 32px;
 }
 
 .employee-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 22px;
 }
 
 .employee-head h2 {
   margin: 0;
   color: #0f172a;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: 32px;
+  font-weight: 850;
+  letter-spacing: -0.045em;
 }
 
 .employee-tools {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  margin-bottom: 14px;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 26px;
 }
 
 .search-group {
-  width: min(420px, 100%);
-  height: 44px;
+  flex: 1;
+  max-width: none;
+  height: 56px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .search-group input {
+  flex: 1;
   width: 100%;
-  height: 44px;
+  min-width: 0;
+  height: 56px;
   border: 1px solid #dbe3ef;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #ffffff;
   color: #0f172a;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 0 14px;
+  font-size: 16px;
+  font-weight: 650;
+  padding: 0 22px;
   outline: none;
   transition: 0.2s ease;
 }
 
 .search-group input::placeholder {
   color: #94a3b8;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .search-group input:focus {
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
 .filter-box {
@@ -680,12 +720,12 @@ onUnmounted(() => {
 }
 
 .filter-btn {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   border: 1px solid #dbe3ef;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #ffffff;
-  color: #475569;
+  color: #334155;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -702,17 +742,32 @@ onUnmounted(() => {
 
 .filter-popover {
   position: absolute;
-  top: 52px;
-  left: 0;
-  width: 240px;
-  max-height: 280px;
+  top: 66px;
+  right: 0;
+  width: 300px;
+  max-height: 430px;
   overflow: auto;
-  padding: 8px;
+  padding: 10px;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14);
-  z-index: 30;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
+  z-index: 50;
+}
+
+.filter-title {
+  padding: 8px 10px 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.filter-divider {
+  height: 1px;
+  margin: 8px 4px;
+  background: #e2e8f0;
 }
 
 .filter-option {
@@ -720,11 +775,11 @@ onUnmounted(() => {
   border: 0;
   background: transparent;
   color: #334155;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 11px 12px;
+  border-radius: 11px;
   text-align: left;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 750;
   cursor: pointer;
   transition: 0.18s ease;
 }
@@ -736,17 +791,19 @@ onUnmounted(() => {
 }
 
 .add-btn {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  margin-left: auto;
   border: 0;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #2563eb;
   color: #ffffff;
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 750;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.24);
   transition: 0.2s ease;
 }
 
@@ -809,20 +866,45 @@ onUnmounted(() => {
 
 @media (max-width: 768px) {
   .employee-card {
-    padding: 16px;
+    padding: 18px;
   }
 
   .employee-head {
-    align-items: center;
+    margin-bottom: 18px;
+  }
+
+  .employee-head h2 {
+    font-size: 24px;
+  }
+
+  .employee-tools {
+    gap: 12px;
+    margin-bottom: 18px;
   }
 
   .search-group {
     width: 100%;
+    height: 52px;
+    gap: 8px;
+  }
+
+  .search-group input {
+    height: 52px;
+    font-size: 14px;
+    padding: 0 14px;
+  }
+
+  .filter-btn,
+  .add-btn {
+    width: 52px;
+    height: 52px;
+    flex-basis: 52px;
+    border-radius: 14px;
   }
 
   .filter-popover {
     right: 0;
-    left: auto;
+    width: 280px;
   }
 }
 </style>

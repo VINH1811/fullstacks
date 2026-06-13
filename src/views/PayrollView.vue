@@ -41,7 +41,68 @@
       </div>
     </header>
 
+    <!-- STATS -->
+    <div class="stats-grid">
+      <article class="stat-card">
+        <div class="stat-icon purple">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div>
+          <p class="stat-label">{{ canManage ? 'Nhân sự N1' : 'Nhân viên' }}</p>
+          <h3>{{ canManage ? employees.length : (myEmployeeId ? 1 : 0) }}</h3>
+          <span>{{ canManage ? 'Nguồn HR Core' : 'Dữ liệu cá nhân' }}</span>
+        </div>
+      </article>
 
+      <article class="stat-card">
+        <div class="stat-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+            <path d="M21 3v6h-6"/>
+          </svg>
+        </div>
+        <div>
+          <p class="stat-label">Đã sync N3</p>
+          <h3>{{ replicas.length }}</h3>
+          <span>EmployeeReplicas</span>
+        </div>
+      </article>
+
+      <article class="stat-card">
+        <div class="stat-icon amber">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M14 2v6h6"/>
+            <path d="M16 13H8"/>
+            <path d="M16 17H8"/>
+          </svg>
+        </div>
+        <div>
+          <p class="stat-label">Phiếu lương</p>
+          <h3>{{ payslips.length }}</h3>
+          <span>Tháng {{ monthYear }}</span>
+        </div>
+      </article>
+
+      <article class="stat-card">
+        <div class="stat-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M12 1v22"/>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <div>
+          <p class="stat-label">{{ canManage ? 'Quỹ lương' : 'Thực lãnh' }}</p>
+          <h3>{{ money(totalFund) }}</h3>
+          <span>Net salary</span>
+        </div>
+      </article>
+    </div>
 
     <!-- COMPACT WORKFLOW -->
     <article v-if="canManage" class="workflow-card">

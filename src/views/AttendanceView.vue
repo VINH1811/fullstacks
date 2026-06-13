@@ -1,209 +1,238 @@
 <template>
-  <section class="page attendance-premium" :class="{ loading }">
-    <div v-if="message" class="alert" :class="messageType">{{ message }}</div>
-
-    <div class="grid cols-4 compact-stats">
-      <article class="card stat-card"><p class="stat-label">Bản ghi</p><p class="stat-value">{{ records.length }}</p></article>
-      <article class="card stat-card"><p class="stat-label">Đi làm</p><p class="stat-value">{{ presentDays }}</p></article>
-      <article class="card stat-card"><p class="stat-label">Tăng ca</p><p class="stat-value">{{ overtimeHours }}h</p></article>
-      <article class="card stat-card"><p class="stat-label">Muộn/sớm</p><p class="stat-value">{{ lateEarlyCount }}</p></article>
+  <section class="page attendance-page" :class="{ loading }">
+    <div v-if="message" class="alert" :class="messageType">
+      {{ message }}
     </div>
 
-    <article v-if="isSelfService" class="card premium-card face-attendance-card">
-      <div class="card-header">
-        <div class="card-title">
-          <h2>Chấm công khuôn mặt</h2>
-          <p>Chụp mặt trước khi check-in hoặc check-out.</p>
-        </div>
-        <span class="pill neutral">{{ myEmployeeLabel }}</span>
-      </div>
-
-      <div class="camera-workspace">
-        <div class="camera-main">
-          <div
-            class="camera-viewport"
-            :class="{
-              'is-active': camera.active && !facePreview,
-              'has-preview': !!facePreview,
-              'has-error': !!camera.error,
-            }"
-          >
-            <video
-              v-if="camera.active && !facePreview"
-              ref="videoRef"
-              autoplay
-              muted
-              playsinline
-              @loadedmetadata="handleCameraReady"
-            ></video>
-
-            <img
-              v-else-if="facePreview"
-              :src="facePreview"
-              alt="Ảnh xác thực khuôn mặt"
-            />
-
-            <div v-else class="camera-placeholder">
-              <div class="camera-placeholder-icon" aria-hidden="true">📷</div>
-              <strong>Camera chưa bật</strong>
-              <small>Nhấn “Bật camera” để bắt đầu xác thực khuôn mặt.</small>
-            </div>
-
-            <div v-if="camera.active && !facePreview" class="face-guide" aria-hidden="true">
-              <span class="face-guide-oval"></span>
-              <span class="guide-corner top-left"></span>
-              <span class="guide-corner top-right"></span>
-              <span class="guide-corner bottom-left"></span>
-              <span class="guide-corner bottom-right"></span>
-            </div>
-
-            <div class="camera-status" :class="cameraStatusClass">
-              <span class="status-dot"></span>
-              {{ cameraStatusText }}
-            </div>
-          </div>
-
-          <canvas ref="canvasRef" width="720" height="540" hidden></canvas>
-
-          <div class="camera-hints">
-            <span>Đặt khuôn mặt ở giữa khung</span>
-            <span>Giữ khoảng cách khoảng 40–70 cm</span>
-            <span>Đảm bảo khuôn mặt đủ sáng</span>
-          </div>
+    <article class="card attendance-card">
+      <div class="attendance-head">
+        <div>
+          <h2>Chấm công</h2>
+          <p>Lịch chuẩn: Thứ 2 - Thứ 7 đi làm, Chủ nhật nghỉ.</p>
         </div>
 
-        <aside class="camera-control-panel">
-          <div class="camera-employee">
-            <span class="camera-employee-label">Nhân viên đang chấm công</span>
-            <strong>{{ myEmployeeLabel }}</strong>
-          </div>
+        <div class="head-actions">
+          <button v-if="isSelfService" class="btn soft" @click="openFaceModal">
+            Face ID
+          </button>
 
-          <div class="camera-instruction">
-            <strong>{{ facePreview ? 'Ảnh đã sẵn sàng' : 'Hướng dẫn' }}</strong>
-            <p v-if="facePreview">
-              Kiểm tra ảnh rõ mặt trước khi thực hiện check-in hoặc check-out.
-            </p>
-            <p v-else>
-              Bật camera, nhìn thẳng vào khung hướng dẫn rồi nhấn chụp mặt.
-            </p>
-          </div>
-
-          <div class="face-actions">
-            <button class="btn ghost" :disabled="camera.active" @click="startCamera">
-              Bật camera
-            </button>
-            <button class="btn warning" :disabled="!camera.ready || !!facePreview" @click="captureFace">
-              Chụp mặt
-            </button>
-            <button class="btn success" :disabled="!canSubmitFace" @click="faceCheckIn">
-              Face check-in
-            </button>
-            <button class="btn primary" :disabled="!canSubmitFace" @click="faceCheckOut">
-              Face check-out
-            </button>
-            <button class="btn ghost camera-action-wide" @click="retakeFace">
-              {{ facePreview ? 'Chụp lại ảnh' : 'Làm mới camera' }}
-            </button>
-          </div>
-
-          <small class="camera-note">
-            Ảnh chỉ được dùng cho bước xác thực chấm công hiện tại.
-          </small>
-        </aside>
-      </div>
-    </article>
-
-    <article class="card premium-card">
-      <div class="card-header calendar-top">
-        <div class="card-title">
-          <h2>Lịch ngày làm / ngày nghỉ</h2>
-          <p>Nhấn trực tiếp vào ngày để xem hoặc xóa dữ liệu.</p>
-        </div>
-
-        <div class="toolbar compact-filter">
           <select v-if="canManage" v-model="calendarEmployeeId">
             <option value="">Tất cả nhân viên</option>
-            <option v-for="emp in employees" :key="empId(emp)" :value="empId(emp)">
+            <option v-for="emp in employeeOptions" :key="empId(emp)" :value="empId(emp)">
               {{ empLabel(emp) }}
             </option>
           </select>
-          <span v-else class="pill neutral">{{ myEmployeeLabel }}</span>
+
+          <span v-else class="pill neutral">
+            {{ myEmployeeLabel }}
+          </span>
+
           <input v-model.number="filter.month" type="number" min="1" max="12" @change="loadAll" />
           <input v-model.number="filter.year" type="number" min="2020" @change="loadAll" />
-          <button class="btn ghost" @click="loadAll">Tải</button>
+
+          <button class="btn primary" @click="loadAll">
+            Tải
+          </button>
         </div>
       </div>
 
-      <div class="calendar-workspace">
-        <div class="calendar-grid professional-calendar">
-          <div
-            v-for="day in calendarDays"
-            :key="day.key"
-            class="calendar-day"
-            :class="[day.className, { active: selectedDay?.key === day.key }]"
-            @click="openDay(day)"
-          >
-            <div class="calendar-day-head">
-              <strong>{{ day.day }}</strong>
-              <span>{{ day.weekday }}</span>
+      <div class="work-layout">
+        <div class="calendar-area">
+          <div class="weekday-row">
+            <span>Thứ 2</span>
+            <span>Thứ 3</span>
+            <span>Thứ 4</span>
+            <span>Thứ 5</span>
+            <span>Thứ 6</span>
+            <span>Thứ 7</span>
+            <span>CN</span>
+          </div>
+
+          <div class="work-calendar">
+            <div v-for="slot in calendarDays" :key="slot.key" class="calendar-slot">
+              <button
+                v-if="!slot.empty"
+                type="button"
+                class="day-card"
+                :class="[slot.className, { active: selectedDay?.key === slot.key }]"
+                @click="openDay(slot)"
+              >
+                <div class="day-top">
+                  <strong>{{ slot.day }}</strong>
+                  <span>{{ slot.shortWeekday }}</span>
+                </div>
+
+                <p>{{ slot.label }}</p>
+
+                <small v-if="slot.note">
+                  {{ slot.note }}
+                </small>
+
+                <div v-if="slot.badges.length" class="day-badges">
+                  <span v-for="badge in slot.badges" :key="badge" class="mini-badge">
+                    {{ badge }}
+                  </span>
+                </div>
+              </button>
+
+              <div v-else class="calendar-empty"></div>
             </div>
-            <p>{{ day.label }}</p>
-            <small>{{ day.note }}</small>
           </div>
         </div>
 
-        <aside v-if="selectedDay" class="day-inspector">
-          <div class="inspector-head">
-            <div>
-              <span class="eyebrow">Ngày đã chọn</span>
-              <h3>{{ date(selectedDay.key) }}</h3>
-            </div>
-            <button class="btn ghost small" @click="selectedDay = null">Đóng</button>
-          </div>
-
-          <div class="inspector-section schedule-editor">
-            <strong>Đăng ký lịch làm</strong>
-
-            <EmployeePicker v-if="canManage" v-model="scheduleForm.employeeId" :employees="employees" />
-            <div v-else class="locked-field">{{ myEmployeeLabel }}</div>
-
-            <div class="form-field">
-              <label>Trạng thái</label>
-              <select v-model="scheduleForm.shift">
-                <option value="Work">Đi làm</option>
-                <option value="Off">Nghỉ</option>
-              </select>
-            </div>
-
-            <div class="actions">
-              <button class="btn primary" @click="saveSchedule">Lưu lịch</button>
-              <button class="btn danger" @click="deleteSchedule">Xóa lịch</button>
-            </div>
-
-            <p>{{ selectedSchedule ? `Hiện tại: ${scheduleLabel(selectedSchedule.shift)}` : 'Chưa có lịch.' }}</p>
-          </div>
-
-          <div class="inspector-section">
-            <strong>Nghỉ phép</strong>
-            <div v-if="selectedLeaves.length" class="mini-list">
-              <div v-for="leave in selectedLeaves" :key="leaveId(leave)" class="mini-row">
-                <span>{{ employeeLabel(leaveEmployeeId(leave)) }}</span>
-                <small>{{ leaveStatus(leave) }}</small>
+        <aside class="day-panel">
+          <template v-if="selectedDay">
+            <div class="panel-head">
+              <div>
+                <span>Ngày chọn</span>
+                <h3>{{ date(selectedDay.key) }}</h3>
               </div>
+
+              <button class="close-btn" title="Đóng" @click="selectedDay = null">
+                ×
+              </button>
             </div>
-            <p v-else>Không có đơn nghỉ phép.</p>
+
+            <div class="shift-box" :class="selectedDay.isSunday ? 'is-off' : 'is-work'">
+              <span>Ca chuẩn</span>
+              <strong>{{ selectedDay.isSunday ? 'Nghỉ' : '08:00 - 17:00' }}</strong>
+            </div>
+
+            <template v-if="canManage">
+              <div class="panel-section">
+                <div class="section-title">
+                  Nhân sự đi làm
+                  <span>{{ assignedEmployeesForSelectedDay.length }}</span>
+                </div>
+
+                <div class="employee-list">
+                  <div v-for="emp in assignedEmployeesForSelectedDay" :key="empId(emp)" class="employee-chip">
+                    {{ empLabel(emp) }}
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="approvedRequestsForSelectedDay.length" class="panel-section">
+                <div class="section-title">
+                  Đã duyệt
+                  <span>{{ approvedRequestsForSelectedDay.length }}</span>
+                </div>
+
+                <div class="request-list compact">
+                  <div v-for="request in approvedRequestsForSelectedDay" :key="request.id" class="request-row">
+                    <div>
+                      <strong>{{ request.type === 'overtime' ? 'Tăng ca' : 'Nghỉ phép' }}</strong>
+                      <small>{{ request.employeeLabel }}</small>
+                    </div>
+                    <span>{{ request.type === 'overtime' ? `${request.hours}h` : 'Đã duyệt' }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <div class="panel-section">
+                <div class="section-title">Yêu cầu của tôi</div>
+
+                <div class="request-tabs">
+                  <button
+                    class="tab-btn"
+                    :class="{ active: requestForm.type === 'overtime' }"
+                    @click="requestForm.type = 'overtime'"
+                  >
+                    Tăng ca
+                  </button>
+
+                  <button
+                    class="tab-btn"
+                    :class="{ active: requestForm.type === 'leave' }"
+                    @click="requestForm.type = 'leave'"
+                  >
+                    Nghỉ phép
+                  </button>
+                </div>
+
+                <div v-if="requestForm.type === 'overtime'" class="request-form">
+                  <label>Số giờ</label>
+                  <input v-model.number="requestForm.hours" type="number" min="1" max="6" />
+
+                  <label>Lý do</label>
+                  <textarea v-model.trim="requestForm.reason" rows="3" placeholder="Nhập lý do tăng ca"></textarea>
+
+                  <button class="btn primary full" :disabled="selectedDay.isSunday" @click="submitRequest">
+                    Gửi tăng ca
+                  </button>
+                </div>
+
+                <div v-else class="request-form">
+                  <label>Loại nghỉ</label>
+                  <select v-model="requestForm.leaveType">
+                    <option value="FullDay">Nghỉ cả ngày</option>
+                    <option value="HalfDay">Nghỉ nửa ngày</option>
+                  </select>
+
+                  <label>Lý do</label>
+                  <textarea v-model.trim="requestForm.reason" rows="3" placeholder="Nhập lý do nghỉ phép"></textarea>
+
+                  <button class="btn primary full" :disabled="selectedDay.isSunday" @click="submitRequest">
+                    Gửi nghỉ phép
+                  </button>
+                </div>
+
+                <div v-if="myRequestsForSelectedDay.length" class="request-list self">
+                  <div v-for="request in myRequestsForSelectedDay" :key="request.id" class="request-row">
+                    <div>
+                      <strong>{{ request.type === 'overtime' ? 'Tăng ca' : 'Nghỉ phép' }}</strong>
+                      <small>{{ request.reason || 'Không có ghi chú' }}</small>
+                    </div>
+                    <span :class="request.status.toLowerCase()">{{ requestStatusText(request.status) }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </template>
+
+          <div v-else class="empty-panel">
+            <strong>Chọn một ngày</strong>
+            <span>Xem ca làm, gửi yêu cầu hoặc duyệt yêu cầu.</span>
           </div>
         </aside>
       </div>
     </article>
 
-    <article class="card premium-card">
-      <div class="card-header">
-        <div class="card-title">
-          <h2>Lịch sử chấm công</h2>
-          <p>Hiển thị theo mã nhân viên và họ tên.</p>
+    <article v-if="canManage && pendingRequests.length" class="card attendance-card approval-card">
+      <div class="section-head">
+        <h2>Yêu cầu chờ duyệt</h2>
+        <span>{{ pendingRequests.length }}</span>
+      </div>
+
+      <div class="approval-grid">
+        <div v-for="request in pendingRequests" :key="request.id" class="approval-item">
+          <div>
+            <strong>{{ request.employeeLabel }}</strong>
+            <p>{{ request.type === 'overtime' ? `Tăng ca ${request.hours}h` : 'Nghỉ phép' }} · {{ date(request.date) }}</p>
+            <small>{{ request.reason || 'Không có ghi chú' }}</small>
+          </div>
+
+          <div class="approval-actions">
+            <button class="btn success small" @click="approveRequest(request)">
+              Duyệt
+            </button>
+            <button class="btn danger small" @click="rejectRequest(request)">
+              Từ chối
+            </button>
+          </div>
         </div>
-        <button class="btn primary" @click="exportExcel">Xuất Excel</button>
+      </div>
+    </article>
+
+    <article class="card attendance-card history-card">
+      <div class="history-head">
+        <h2>Lịch sử chấm công</h2>
+
+        <button class="btn primary" @click="exportExcel">
+          Xuất Excel
+        </button>
       </div>
 
       <div class="table-wrap">
@@ -217,163 +246,293 @@
               <th>Giờ làm</th>
               <th>OT</th>
               <th>Trạng thái</th>
-              <th v-if="canManage">Xóa</th>
+              <th v-if="canManage" class="text-right">Xóa</th>
             </tr>
           </thead>
+
           <tbody>
             <tr v-for="item in filteredRecords" :key="recordId(item)">
               <td class="name-cell">
                 <strong>{{ employeeLabel(recordEmployeeId(item)) }}</strong>
-                <span>{{ shortId(recordEmployeeId(item)) }}</span>
               </td>
+
               <td>{{ date(recordDate(item)) }}</td>
               <td>{{ time(recordCheckIn(item)) }}</td>
               <td>{{ time(recordCheckOut(item)) }}</td>
               <td>{{ workHours(item) }}h</td>
               <td>{{ recordOvertime(item) }}h</td>
-              <td><span class="pill" :class="statusClass(attendanceStatus(item))">{{ attendanceStatus(item) }}</span></td>
-              <td v-if="canManage"><button class="btn small danger" @click="removeRecord(item)">Xóa</button></td>
+
+              <td>
+                <span class="pill" :class="statusClass(attendanceStatus(item))">
+                  {{ attendanceStatus(item) }}
+                </span>
+              </td>
+
+              <td v-if="canManage">
+                <div class="actions right">
+                  <button class="icon-action danger" title="Xóa" @click="removeRecord(item)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M6 7h12M10 11v6M14 11v6M9 7l1-3h4l1 3M8 7l1 13h6l1-13"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </td>
             </tr>
+
             <tr v-if="!filteredRecords.length">
-              <td :colspan="canManage ? 8 : 7" class="empty">Chưa có dữ liệu.</td>
+              <td :colspan="canManage ? 8 : 7" class="empty">
+                Chưa có dữ liệu.
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </article>
 
-    <article v-if="canManage" class="card premium-card">
-      <div class="card-header">
-        <div class="card-title">
-          <h2>Chốt công cuối tháng</h2>
-          <p>Dữ liệu N2 dùng để kích hoạt tính lương N3.</p>
+    
+
+    <div v-if="showFaceModal" class="modal-backdrop">
+      <div class="modal face-modal">
+        <div class="modal-head">
+          <div>
+            <h2>Chấm công khuôn mặt</h2>
+            <p class="modal-subtitle">{{ myEmployeeLabel }}</p>
+          </div>
+
+          <button class="btn ghost" @click="closeFaceModal">
+            Đóng
+          </button>
         </div>
-        <div class="toolbar compact-filter">
-          <input v-model.number="filter.month" type="number" min="1" max="12" />
-          <input v-model.number="filter.year" type="number" min="2020" />
-          <button class="btn primary" @click="monthlyClose">Chốt công</button>
+
+        <div class="face-layout">
+          <div class="face-box">
+            <video
+              v-if="camera.active && !facePreview"
+              ref="videoRef"
+              autoplay
+              muted
+              playsinline
+            ></video>
+
+            <img
+              v-else-if="facePreview"
+              :src="facePreview"
+              alt="Ảnh xác thực khuôn mặt"
+            />
+
+            <div v-else class="face-placeholder">
+              <strong>Camera</strong>
+              <span>Chưa bật</span>
+            </div>
+
+            <canvas ref="canvasRef" width="420" height="280" hidden></canvas>
+          </div>
+
+          <div class="face-actions">
+            <button class="btn ghost" @click="startCamera">
+              Bật camera
+            </button>
+
+            <button class="btn soft" :disabled="!camera.active" @click="captureFace">
+              Chụp mặt
+            </button>
+
+            <button class="btn success" :disabled="!canSubmitFace" @click="faceCheckIn">
+              Check-in
+            </button>
+
+            <button class="btn primary" :disabled="!canSubmitFace" @click="faceCheckOut">
+              Check-out
+            </button>
+
+            <button class="btn ghost" @click="resetFace">
+              Làm lại
+            </button>
+          </div>
         </div>
       </div>
-      <pre v-if="monthlyPayload.length" class="payload-box">{{ JSON.stringify(monthlyPayload, null, 2) }}</pre>
-    </article>
+    </div>
   </section>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { attendanceApi, hrApi, unwrapEmployees } from '../services/api'
 import { canManageAttendance, getAuthUser, isEmployeeOnly, requireOwnEmployeeId } from '../services/auth'
 
-const EmployeePicker = defineComponent({
-  props: { modelValue: String, employees: { type: Array, default: () => [] } },
-  emits: ['update:modelValue'],
-  setup(props, { emit }) {
-    return () => h('div', { class: 'form-field compact-picker' }, [
-      h('label', 'Nhân viên'),
-      h('select', { value: props.modelValue, onChange: (e) => emit('update:modelValue', e.target.value) }, [
-        h('option', { value: '' }, 'Chọn nhân viên'),
-        ...props.employees.map((emp) => h('option', { value: empId(emp), key: empId(emp) }, empLabel(emp))),
-      ]),
-    ])
-  },
-})
+const REQUEST_KEY = 'hrm_attendance_requests_v14'
+const RECORD_KEY = 'hrm_attendance_records_v12'
+
+const fallbackEmployees = [
+  { employeeId: 'sample-nv01', employeeCode: 'NV01', fullName: 'Nguyễn Phương Nam' },
+  { employeeId: 'sample-nv02', employeeCode: 'NV02', fullName: 'Phạm Văn Huy' },
+  { employeeId: 'sample-nv05', employeeCode: 'NV05', fullName: 'Đỗ Trung Kiên' },
+  { employeeId: 'sample-nv06', employeeCode: 'NV06', fullName: 'Lương Bạch' },
+  { employeeId: 'sample-nv07', employeeCode: 'NV07', fullName: 'Mạnh Tiến' },
+  { employeeId: 'sample-nv09', employeeCode: 'NV09', fullName: 'Bạch Ngọc Lương' },
+  { employeeId: 'sample-nv10', employeeCode: 'NV10', fullName: 'Phạm Khắc Hoàng' },
+]
 
 const employees = ref([])
 const records = ref(loadLocalRecords())
-const leaves = ref([])
-const schedules = ref(loadSchedules())
+const requests = ref(loadRequests())
+const backendLeaves = ref([])
 const monthlyPayload = ref([])
 const selectedDay = ref(null)
 const message = ref('')
 const messageType = ref('')
 const loading = ref(false)
+const showFaceModal = ref(false)
 
 const now = new Date()
-const filter = reactive({ month: now.getMonth() + 1, year: now.getFullYear() })
-const scheduleForm = reactive({
-  employeeId: '',
-  date: new Date().toISOString().slice(0, 10),
-  shift: 'Work',
+
+const filter = reactive({
+  month: now.getMonth() + 1,
+  year: now.getFullYear(),
 })
+
+const requestForm = reactive({
+  type: 'overtime',
+  hours: 2,
+  leaveType: 'FullDay',
+  reason: '',
+})
+
 const calendarEmployeeId = ref('')
 
 const videoRef = ref(null)
 const canvasRef = ref(null)
 const facePreview = ref('')
-const camera = reactive({ active: false, ready: false, stream: null, error: '' })
 
-const authUser = computed(() => getAuthUser())
+const camera = reactive({
+  active: false,
+  stream: null,
+})
+
+const authUser = computed(() => getAuthUser() || {})
 const canManage = computed(() => canManageAttendance())
 const isSelfService = computed(() => isEmployeeOnly())
-const myEmployeeId = computed(() => authUser.value.employeeId)
+const myEmployeeId = computed(() => authUser.value.employeeId || authUser.value.EmployeeId || '')
+
 const myEmployeeLabel = computed(() => {
-  const code = authUser.value.employeeCode || 'NV'
-  const name = authUser.value.fullName || authUser.value.username || 'Employee'
+  const code = authUser.value.employeeCode || authUser.value.EmployeeCode || 'NV'
+  const name = authUser.value.fullName || authUser.value.FullName || authUser.value.username || 'Employee'
   return `${code} - ${name}`
 })
+
 const canSubmitFace = computed(() => !!myEmployeeId.value && !!facePreview.value)
-const cameraStatusText = computed(() => {
-  if (facePreview.value) return 'Đã chụp ảnh'
-  if (camera.error) return 'Camera gặp lỗi'
-  if (camera.ready) return 'Camera sẵn sàng'
-  if (camera.active) return 'Đang khởi động camera'
-  return 'Camera đang tắt'
-})
-const cameraStatusClass = computed(() => {
-  if (facePreview.value) return 'success'
-  if (camera.error) return 'error'
-  if (camera.ready) return 'live'
-  return 'idle'
+
+const employeeOptions = computed(() => {
+  if (employees.value.length) return employees.value
+
+  const directory = loadEmployeeDirectory()
+
+  return directory.length ? directory : fallbackEmployees
 })
 
 const filteredRecords = computed(() => {
   const employeeId = isSelfService.value ? myEmployeeId.value : calendarEmployeeId.value
-  return records.value.filter((r) => !employeeId || recordEmployeeId(r) === employeeId)
+
+  return records.value.filter((record) => {
+    const d = new Date(recordDate(record))
+    const sameMonth = d.getMonth() + 1 === Number(filter.month)
+    const sameYear = d.getFullYear() === Number(filter.year)
+    const sameEmployee = !employeeId || recordEmployeeId(record) === employeeId
+
+    return sameMonth && sameYear && sameEmployee
+  })
 })
 
-const presentDays = computed(() => filteredRecords.value.filter((r) => String(r.status || r.Status || '').toLowerCase() === 'present').length)
-const overtimeHours = computed(() => filteredRecords.value.reduce((sum, r) => sum + Number(recordOvertime(r) || 0), 0).toFixed(2))
-const lateEarlyCount = computed(() => filteredRecords.value.filter((r) => ['Muộn', 'Về sớm', 'Muộn + về sớm'].includes(attendanceStatus(r))).length)
 const calendarDays = computed(() => buildCalendar())
 
-const selectedSchedule = computed(() => {
-  if (!selectedDay.value) return null
-  const employeeId = isSelfService.value ? myEmployeeId.value : calendarEmployeeId.value
-  return schedules.value.find((s) => (!employeeId || s.employeeId === employeeId) && s.date === selectedDay.value.key)
+const pendingRequests = computed(() => {
+  return requests.value
+    .filter((request) => request.status === 'Pending')
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
 })
-const selectedLeaves = computed(() => {
+
+const assignedEmployeesForSelectedDay = computed(() => {
+  if (!selectedDay.value || selectedDay.value.isSunday) return []
+
+  if (calendarEmployeeId.value) {
+    const emp = employeeOptions.value.find((item) => empId(item) === calendarEmployeeId.value)
+    return emp ? [emp] : []
+  }
+
+  return assignedEmployees(selectedDay.value.key)
+})
+
+const approvedRequestsForSelectedDay = computed(() => {
   if (!selectedDay.value) return []
-  const employeeId = isSelfService.value ? myEmployeeId.value : calendarEmployeeId.value
-  return leaves.value.filter((l) => {
-    const emp = leaveEmployeeId(l)
-    const from = String(l.fromDate || l.FromDate || '').slice(0, 10)
-    const to = String(l.toDate || l.ToDate || '').slice(0, 10)
-    return (!employeeId || emp === employeeId) && from <= selectedDay.value.key && to >= selectedDay.value.key
+
+  return requests.value.filter((request) => {
+    const sameDate = request.date === selectedDay.value.key
+    const sameEmployee = !calendarEmployeeId.value || request.employeeId === calendarEmployeeId.value
+
+    return sameDate && sameEmployee && request.status === 'Approved'
+  })
+})
+
+const myRequestsForSelectedDay = computed(() => {
+  if (!selectedDay.value) return []
+
+  return requests.value.filter((request) => {
+    return request.employeeId === myEmployeeId.value && request.date === selectedDay.value.key
   })
 })
 
 function notify(text, type = 'success') {
   message.value = text
   messageType.value = type
+
   setTimeout(() => {
     message.value = ''
-  }, 4200)
+  }, 3800)
+}
+
+function empId(emp = {}) {
+  return emp.employeeId || emp.EmployeeId || emp.id || emp.Id || ''
+}
+
+function empCode(emp = {}) {
+  return emp.employeeCode || emp.EmployeeCode || emp.code || '—'
+}
+
+function empName(emp = {}) {
+  return emp.fullName || emp.FullName || emp.name || '—'
+}
+
+function empLabel(emp = {}) {
+  return `${empCode(emp)} - ${empName(emp)}`
+}
+
+function employeeLabel(employeeId) {
+  const emp = employeeOptions.value.find((item) => empId(item) === employeeId)
+
+  if (emp) return empLabel(emp)
+  if (employeeId === myEmployeeId.value) return myEmployeeLabel.value
+
+  return shortId(employeeId)
+}
+
+function employeeCodeOnly(employeeId) {
+  const emp = employeeOptions.value.find((item) => empId(item) === employeeId)
+
+  if (emp) return empCode(emp)
+  if (employeeId === myEmployeeId.value) return authUser.value.employeeCode || authUser.value.EmployeeCode || 'NV'
+
+  return shortId(employeeId)
 }
 
 function shortId(value = '') {
   const text = String(value || '')
-  return text.length > 14 ? `${text.slice(0, 8)}...` : text || '—'
-}
-
-function empId(emp = {}) { return emp.employeeId || emp.EmployeeId || emp.id || emp.Id || '' }
-function empCode(emp = {}) { return emp.employeeCode || emp.EmployeeCode || emp.code || '—' }
-function empName(emp = {}) { return emp.fullName || emp.FullName || emp.name || '—' }
-function empLabel(emp = {}) { return `${empCode(emp)} - ${empName(emp)}` }
-function employeeLabel(employeeId) {
-  const emp = employees.value.find((e) => empId(e) === employeeId)
-  if (emp) return empLabel(emp)
-  if (employeeId === myEmployeeId.value) return myEmployeeLabel.value
-  return shortId(employeeId)
+  return text.length > 10 ? `${text.slice(0, 6)}...` : text || '—'
 }
 
 function unwrapList(response) {
@@ -381,162 +540,330 @@ function unwrapList(response) {
   return response?.data || response?.Data || response?.items || response?.Items || []
 }
 
-function recordId(r) { return r.attendanceId || r.AttendanceId || r.dailyAttendanceId || r.DailyAttendanceId || r.id || r.Id || r.localId }
-function recordEmployeeId(r) { return r.employeeId || r.EmployeeId || '' }
-function recordDate(r) { return r.workingDate || r.WorkingDate || r.date || r.Date }
-function recordCheckIn(r) { return r.checkInTime || r.CheckInTime }
-function recordCheckOut(r) { return r.checkOutTime || r.CheckOutTime }
-function recordOvertime(r) { return Number(r.overtimeHours ?? r.OvertimeHours ?? 0).toFixed(2) }
-function leaveId(l) { return l.leaveId || l.LeaveId || l.id || l.Id }
-function leaveEmployeeId(l) { return l.employeeId || l.EmployeeId || '' }
-function leaveStatus(l) { return l.approvalStatus || l.ApprovalStatus || 'Pending' }
+function recordId(record = {}) {
+  return (
+    record.attendanceId ||
+    record.AttendanceId ||
+    record.dailyAttendanceId ||
+    record.DailyAttendanceId ||
+    record.id ||
+    record.Id ||
+    record.localId
+  )
+}
+
+function recordEmployeeId(record = {}) {
+  return record.employeeId || record.EmployeeId || ''
+}
+
+function recordDate(record = {}) {
+  return record.workingDate || record.WorkingDate || record.date || record.Date
+}
+
+function recordCheckIn(record = {}) {
+  return record.checkInTime || record.CheckInTime
+}
+
+function recordCheckOut(record = {}) {
+  return record.checkOutTime || record.CheckOutTime
+}
+
+function recordOvertime(record = {}) {
+  return Number(record.overtimeHours ?? record.OvertimeHours ?? 0).toFixed(2)
+}
 
 function date(value) {
   if (!value) return '—'
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('vi-VN')
+
+  const parsed = new Date(value)
+
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('vi-VN')
 }
+
 function time(value) {
   if (!value) return '—'
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? String(value).slice(0, 5) : d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+
+  const parsed = new Date(value)
+
+  return Number.isNaN(parsed.getTime())
+    ? String(value).slice(0, 5)
+    : parsed.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
 }
-function workHours(r) {
-  const start = new Date(recordCheckIn(r))
-  const end = new Date(recordCheckOut(r))
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '0.00'
+
+function workHours(record) {
+  const start = new Date(recordCheckIn(record))
+  const end = new Date(recordCheckOut(record))
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return '0.00'
+  }
+
   return Math.max(0, (end - start) / 36e5).toFixed(2)
 }
-function attendanceStatus(r) {
-  const checkIn = new Date(recordCheckIn(r))
-  const checkOut = new Date(recordCheckOut(r))
-  const baseDate = new Date(recordDate(r) || recordCheckIn(r) || Date.now())
-  const lateLimit = new Date(baseDate); lateLimit.setHours(8, 15, 0, 0)
-  const earlyLimit = new Date(baseDate); earlyLimit.setHours(17, 0, 0, 0)
+
+function attendanceStatus(record) {
+  const checkIn = new Date(recordCheckIn(record))
+  const checkOut = new Date(recordCheckOut(record))
+  const baseDate = new Date(recordDate(record) || recordCheckIn(record) || Date.now())
+
+  const lateLimit = new Date(baseDate)
+  lateLimit.setHours(8, 15, 0, 0)
+
+  const earlyLimit = new Date(baseDate)
+  earlyLimit.setHours(17, 0, 0, 0)
+
   const late = !Number.isNaN(checkIn.getTime()) && checkIn > lateLimit
   const early = !Number.isNaN(checkOut.getTime()) && checkOut < earlyLimit
+
   if (late && early) return 'Muộn + về sớm'
   if (late) return 'Muộn'
   if (early) return 'Về sớm'
+
   return 'Đúng giờ'
 }
+
 function statusClass(status) {
-  if (String(status).includes('Muộn') || String(status).includes('sớm')) return 'warn'
+  const text = String(status)
+
+  if (text.includes('Muộn') || text.includes('sớm')) {
+    return 'warn'
+  }
+
   return 'success'
 }
 
-function loadSchedules() {
-  try { return JSON.parse(localStorage.getItem('hrm_work_schedules_v12') || '[]') } catch { return [] }
-}
-function persistSchedules() {
-  localStorage.setItem('hrm_work_schedules_v12', JSON.stringify(schedules.value))
-}
-function loadLocalRecords() {
-  try { return JSON.parse(localStorage.getItem('hrm_attendance_records_v12') || '[]') } catch { return [] }
-}
-function persistLocalRecords() {
-  localStorage.setItem('hrm_attendance_records_v12', JSON.stringify(records.value))
-}
-function scheduleKey(employeeId, dateValue) {
-  return `${employeeId || 'all'}__${dateValue}`
-}
-function scheduleLabel(value) {
-  return value === 'Work' ? 'Đi làm' : 'Nghỉ'
-}
-function saveSchedule() {
-  if (isSelfService.value) scheduleForm.employeeId = myEmployeeId.value
-  if (selectedDay.value) scheduleForm.date = selectedDay.value.key
-
-  if (!scheduleForm.employeeId) return notify('Chọn nhân viên trước.', 'error')
-  if (!scheduleForm.date) return notify('Chọn ngày trước.', 'error')
-
-  const key = scheduleKey(scheduleForm.employeeId, scheduleForm.date)
-  schedules.value = schedules.value.filter((s) => s.key !== key)
-  schedules.value.push({ key, employeeId: scheduleForm.employeeId, date: scheduleForm.date, shift: scheduleForm.shift })
-  persistSchedules()
-  notify('Đã lưu lịch làm.')
-}
-function deleteSchedule() {
-  if (isSelfService.value) scheduleForm.employeeId = myEmployeeId.value
-  if (selectedDay.value) scheduleForm.date = selectedDay.value.key
-
-  const key = scheduleKey(scheduleForm.employeeId, scheduleForm.date)
-  const before = schedules.value.length
-  schedules.value = schedules.value.filter((s) => s.key !== key)
-  persistSchedules()
-  notify(before === schedules.value.length ? 'Không có lịch để xóa.' : 'Đã xóa lịch.')
-}
-function deleteSelectedSchedule() {
-  if (!selectedSchedule.value) return
-  schedules.value = schedules.value.filter((s) => s.key !== selectedSchedule.value.key)
-  persistSchedules()
-  notify('Đã xóa lịch ngày này.')
-}
-function openDay(day) {
-  selectedDay.value = day
-  scheduleForm.date = day.key
-
-  if (isSelfService.value) {
-    scheduleForm.employeeId = myEmployeeId.value
-  } else if (calendarEmployeeId.value) {
-    scheduleForm.employeeId = calendarEmployeeId.value
+function requestStatusText(status) {
+  const map = {
+    Pending: 'Chờ duyệt',
+    Approved: 'Đã duyệt',
+    Rejected: 'Từ chối',
   }
 
-  const existing = schedules.value.find((s) => s.employeeId === scheduleForm.employeeId && s.date === day.key)
-  scheduleForm.shift = existing?.shift || 'Work'
+  return map[status] || status
+}
+
+function leaveStatus(leave = {}) {
+  return leave.approvalStatus || leave.ApprovalStatus || 'Pending'
+}
+
+function loadRequests() {
+  try {
+    return JSON.parse(localStorage.getItem(REQUEST_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function persistRequests() {
+  localStorage.setItem(REQUEST_KEY, JSON.stringify(requests.value))
+}
+
+function loadLocalRecords() {
+  try {
+    return JSON.parse(localStorage.getItem(RECORD_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function persistLocalRecords() {
+  localStorage.setItem(RECORD_KEY, JSON.stringify(records.value))
+}
+
+function loadEmployeeDirectory() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('hrm_employee_directory_v13') || '{}')
+
+    return Object.entries(raw).map(([id, value]) => ({
+      employeeId: id,
+      employeeCode: value.employeeCode,
+      fullName: value.fullName,
+    }))
+  } catch {
+    return []
+  }
+}
+
+function openDay(day) {
+  selectedDay.value = day
+  requestForm.reason = ''
+  requestForm.hours = 2
+}
+
+function isSunday(dateValue) {
+  return new Date(dateValue).getDay() === 0
+}
+
+function hashText(text) {
+  let hash = 0
+
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0
+  }
+
+  return hash
+}
+
+function assignedEmployees(dateValue) {
+  if (isSunday(dateValue)) return []
+
+  const list = employeeOptions.value
+
+  if (!list.length) return []
+
+  const count = Math.min(Math.max(5, Math.min(list.length, 5)), list.length)
+  const start = hashText(dateValue) % list.length
+  const result = []
+
+  for (let i = 0; i < count; i += 1) {
+    result.push(list[(start + i) % list.length])
+  }
+
+  return result
+}
+
+function approvedLeaveForEmployee(dateValue, employeeId) {
+  return requests.value.some((request) => {
+    return (
+      request.type === 'leave' &&
+      request.status === 'Approved' &&
+      request.employeeId === employeeId &&
+      request.date === dateValue
+    )
+  })
+}
+
+function backendApprovedLeaveForEmployee(dateValue, employeeId) {
+  return backendLeaves.value.some((leave) => {
+    const emp = leave.employeeId || leave.EmployeeId || ''
+    const from = String(leave.fromDate || leave.FromDate || '').slice(0, 10)
+    const to = String(leave.toDate || leave.ToDate || '').slice(0, 10)
+
+    return emp === employeeId && from <= dateValue && to >= dateValue && leaveStatus(leave) === 'Approved'
+  })
 }
 
 function buildCalendar() {
   const days = []
-  const last = new Date(filter.year, filter.month, 0).getDate()
-  const employeeId = isSelfService.value ? myEmployeeId.value : calendarEmployeeId.value
-  for (let d = 1; d <= last; d++) {
-    const dateValue = `${filter.year}-${String(filter.month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    const dateObj = new Date(dateValue)
-    const schedule = schedules.value.find((s) => (!employeeId || s.employeeId === employeeId) && s.date === dateValue)
-    const leave = leaves.value.find((l) => {
-      const emp = leaveEmployeeId(l)
-      const from = String(l.fromDate || l.FromDate || '').slice(0, 10)
-      const to = String(l.toDate || l.ToDate || '').slice(0, 10)
-      return (!employeeId || emp === employeeId) && from <= dateValue && to >= dateValue && leaveStatus(l) === 'Approved'
-    })
+  const firstDate = new Date(filter.year, filter.month - 1, 1)
+  const leadBlank = firstDate.getDay() === 0 ? 6 : firstDate.getDay() - 1
+  const lastDay = new Date(filter.year, filter.month, 0).getDate()
 
-    let label = 'Trống'
-    let className = 'off'
+  for (let i = 0; i < leadBlank; i += 1) {
+    days.push({
+      key: `empty-${i}`,
+      empty: true,
+    })
+  }
+
+  for (let day = 1; day <= lastDay; day += 1) {
+    const dateValue = `${filter.year}-${String(filter.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const dateObj = new Date(dateValue)
+    const dayIsSunday = isSunday(dateValue)
+    const selectedEmployeeId = isSelfService.value ? myEmployeeId.value : calendarEmployeeId.value
+
+    let label = dayIsSunday ? 'Nghỉ' : 'Đi làm'
     let note = ''
-    if (leave) {
-      label = 'Nghỉ phép'
-      className = 'leave'
-      note = employeeLabel(leaveEmployeeId(leave))
-    } else if (schedule) {
-      label = scheduleLabel(schedule.shift)
-      className = schedule.shift === 'Work' ? 'scheduled' : 'off'
-      note = employeeLabel(schedule.employeeId)
+    let className = dayIsSunday ? 'holiday' : 'work'
+    const badges = []
+
+    if (selectedEmployeeId) {
+      const hasLeave = approvedLeaveForEmployee(dateValue, selectedEmployeeId) || backendApprovedLeaveForEmployee(dateValue, selectedEmployeeId)
+
+      if (hasLeave) {
+        label = 'Nghỉ phép'
+        className = 'leave'
+      }
+
+      note = employeeCodeOnly(selectedEmployeeId)
+    } else if (!dayIsSunday) {
+      const assigned = assignedEmployees(dateValue)
+      note = assigned.length ? `${assigned.length} nhân viên` : 'Chưa có NV'
     }
+
+    const approvedOvertime = requests.value.filter((request) => {
+      return request.type === 'overtime' && request.status === 'Approved' && request.date === dateValue
+    }).length
+
+    const approvedLeave = requests.value.filter((request) => {
+      return request.type === 'leave' && request.status === 'Approved' && request.date === dateValue
+    }).length
+
+    if (approvedOvertime) badges.push(`OT ${approvedOvertime}`)
+    if (approvedLeave && !selectedEmployeeId) badges.push(`Nghỉ ${approvedLeave}`)
 
     days.push({
       key: dateValue,
-      day: d,
-      weekday: dateObj.toLocaleDateString('vi-VN', { weekday: 'short' }),
+      empty: false,
+      day,
+      isSunday: dayIsSunday,
+      weekday: dateObj.toLocaleDateString('vi-VN', { weekday: 'long' }),
+      shortWeekday: dateObj.toLocaleDateString('vi-VN', { weekday: 'short' }),
       label,
-      className,
       note,
+      className,
+      badges,
     })
   }
+
   return days
 }
 
-function saveEmployeeDirectory(list = []) {
-  const directory = {}
-  list.forEach((emp) => {
-    const id = empId(emp)
-    if (id) directory[id] = { employeeCode: empCode(emp), fullName: empName(emp) }
-  })
-  localStorage.setItem('hrm_employee_directory_v13', JSON.stringify(directory))
+function submitRequest() {
+  if (!selectedDay.value) return notify('Chọn ngày trước.', 'error')
+  if (selectedDay.value.isSunday) return notify('Chủ nhật là ngày nghỉ, không cần gửi yêu cầu.', 'error')
+  if (!myEmployeeId.value) return notify('Tài khoản chưa gắn mã nhân viên.', 'error')
+
+  if (!requestForm.reason.trim()) {
+    return notify('Nhập lý do trước khi gửi.', 'error')
+  }
+
+  const request = {
+    id: `req-${Date.now()}`,
+    type: requestForm.type,
+    employeeId: myEmployeeId.value,
+    employeeLabel: myEmployeeLabel.value,
+    date: selectedDay.value.key,
+    hours: requestForm.type === 'overtime' ? Number(requestForm.hours || 0) : 0,
+    leaveType: requestForm.type === 'leave' ? requestForm.leaveType : '',
+    reason: requestForm.reason.trim(),
+    status: 'Pending',
+    createdAt: new Date().toISOString(),
+  }
+
+  requests.value.unshift(request)
+  persistRequests()
+
+  requestForm.reason = ''
+  requestForm.hours = 2
+
+  notify('Đã gửi yêu cầu, chờ HR/Admin duyệt.')
+}
+
+function approveRequest(request) {
+  request.status = 'Approved'
+  request.reviewedAt = new Date().toISOString()
+  request.reviewedBy = authUser.value.username || 'Admin'
+
+  persistRequests()
+  notify('Đã duyệt yêu cầu.')
+}
+
+function rejectRequest(request) {
+  request.status = 'Rejected'
+  request.reviewedAt = new Date().toISOString()
+  request.reviewedBy = authUser.value.username || 'Admin'
+
+  persistRequests()
+  notify('Đã từ chối yêu cầu.')
 }
 
 async function loadEmployees() {
-  if (!canManage.value) return
+  if (!canManage.value && !isSelfService.value) return
+
   try {
     employees.value = unwrapEmployees(await hrApi.employees.list({ pageSize: 1000 }))
     saveEmployeeDirectory(employees.value)
@@ -544,168 +871,141 @@ async function loadEmployees() {
     employees.value = []
   }
 }
+
+function saveEmployeeDirectory(list = []) {
+  const directory = {}
+
+  list.forEach((emp) => {
+    const id = empId(emp)
+
+    if (id) {
+      directory[id] = {
+        employeeCode: empCode(emp),
+        fullName: empName(emp),
+      }
+    }
+  })
+
+  localStorage.setItem('hrm_employee_directory_v13', JSON.stringify(directory))
+}
+
 async function loadRecords() {
   try {
-    const params = { month: filter.month, year: filter.year }
-    if (isSelfService.value) params.employeeId = requireOwnEmployeeId()
+    const params = {
+      month: filter.month,
+      year: filter.year,
+    }
+
+    if (isSelfService.value && myEmployeeId.value) {
+      params.employeeId = requireOwnEmployeeId()
+    }
+
     const apiRecords = unwrapList(await attendanceApi.records.list(params))
+
     records.value = apiRecords.length ? apiRecords : loadLocalRecords()
   } catch {
     records.value = loadLocalRecords()
   }
 }
+
 async function loadLeaves() {
   try {
-    leaves.value = unwrapList(isSelfService.value ? await attendanceApi.leaves.byEmployee(requireOwnEmployeeId()) : await attendanceApi.leaves.list())
+    backendLeaves.value = unwrapList(
+      isSelfService.value && myEmployeeId.value
+        ? await attendanceApi.leaves.byEmployee(requireOwnEmployeeId())
+        : await attendanceApi.leaves.list()
+    )
   } catch {
-    leaves.value = []
+    backendLeaves.value = []
   }
 }
+
 async function loadAll() {
   loading.value = true
+
   try {
     await Promise.all([loadEmployees(), loadRecords(), loadLeaves()])
+
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const sameMonth = Number(todayKey.slice(5, 7)) === Number(filter.month)
+    const sameYear = Number(todayKey.slice(0, 4)) === Number(filter.year)
+
+    if (!selectedDay.value && sameMonth && sameYear) {
+      selectedDay.value = calendarDays.value.find((day) => day.key === todayKey) || null
+    }
   } finally {
     loading.value = false
   }
 }
 
-async function startCamera() {
+function openFaceModal() {
+  showFaceModal.value = true
+}
+
+function closeFaceModal() {
+  showFaceModal.value = false
+  resetFace()
   stopCamera()
-  facePreview.value = ''
-  camera.error = ''
+}
 
+async function startCamera() {
   try {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('Trình duyệt không hỗ trợ truy cập camera.')
-    }
-
     camera.stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'user',
-        width: { ideal: 1280 },
-        height: { ideal: 960 },
-        aspectRatio: { ideal: 4 / 3 },
-      },
+      video: true,
       audio: false,
     })
 
     camera.active = true
+    facePreview.value = ''
+
     await nextTick()
 
-    if (!videoRef.value) {
-      throw new Error('Không tìm thấy vùng hiển thị camera.')
+    if (videoRef.value) {
+      videoRef.value.srcObject = camera.stream
     }
-
-    videoRef.value.srcObject = camera.stream
-
-    try {
-      await videoRef.value.play()
-    } catch {
-      // Thuộc tính autoplay sẽ tiếp tục xử lý trên các trình duyệt hỗ trợ.
-    }
-
-    if (videoRef.value.readyState >= 2) handleCameraReady()
-  } catch (error) {
-    stopCamera()
-    camera.error = error?.message || 'Không thể truy cập camera.'
-    notify('Không mở được camera. Hãy kiểm tra quyền camera của trình duyệt.', 'error')
+  } catch {
+    notify('Không mở được camera.', 'error')
   }
-}
-
-function handleCameraReady() {
-  camera.ready = true
-  camera.error = ''
 }
 
 function captureFace() {
-  const video = videoRef.value
-  const canvas = canvasRef.value
+  if (!videoRef.value || !canvasRef.value) return
 
-  if (!video || !canvas || !camera.ready) {
-    return notify('Camera chưa sẵn sàng để chụp.', 'error')
-  }
+  const context = canvasRef.value.getContext('2d')
+  context.drawImage(videoRef.value, 0, 0, canvasRef.value.width, canvasRef.value.height)
 
-  const sourceWidth = video.videoWidth
-  const sourceHeight = video.videoHeight
+  facePreview.value = canvasRef.value.toDataURL('image/jpeg', 0.86)
 
-  if (!sourceWidth || !sourceHeight) {
-    return notify('Chưa nhận được hình ảnh từ camera.', 'error')
-  }
-
-  const targetWidth = 720
-  const targetHeight = 540
-  const targetRatio = targetWidth / targetHeight
-  const sourceRatio = sourceWidth / sourceHeight
-
-  let sourceX = 0
-  let sourceY = 0
-  let cropWidth = sourceWidth
-  let cropHeight = sourceHeight
-
-  // Crop từ tâm để ảnh không bị kéo méo khi camera trả về tỉ lệ khác 4:3.
-  if (sourceRatio > targetRatio) {
-    cropWidth = sourceHeight * targetRatio
-    sourceX = (sourceWidth - cropWidth) / 2
-  } else if (sourceRatio < targetRatio) {
-    cropHeight = sourceWidth / targetRatio
-    sourceY = (sourceHeight - cropHeight) / 2
-  }
-
-  canvas.width = targetWidth
-  canvas.height = targetHeight
-
-  const context = canvas.getContext('2d')
-  if (!context) return notify('Không thể xử lý ảnh camera.', 'error')
-
-  context.save()
-  context.clearRect(0, 0, targetWidth, targetHeight)
-
-  // Lật ảnh giống phần xem trước để người dùng không thấy ảnh bị đảo chiều sau khi chụp.
-  context.translate(targetWidth, 0)
-  context.scale(-1, 1)
-  context.drawImage(
-    video,
-    sourceX,
-    sourceY,
-    cropWidth,
-    cropHeight,
-    0,
-    0,
-    targetWidth,
-    targetHeight,
-  )
-  context.restore()
-
-  facePreview.value = canvas.toDataURL('image/jpeg', 0.9)
   stopCamera()
 }
 
 function resetFace() {
   facePreview.value = ''
-  camera.error = ''
-}
-
-async function retakeFace() {
-  resetFace()
-  await startCamera()
 }
 
 function stopCamera() {
-  if (camera.stream) camera.stream.getTracks().forEach((track) => track.stop())
-  if (videoRef.value) videoRef.value.srcObject = null
+  if (camera.stream) {
+    camera.stream.getTracks().forEach((track) => track.stop())
+  }
+
   camera.stream = null
   camera.active = false
-  camera.ready = false
 }
+
 async function verifyFacePhoto() {
-  if (!facePreview.value) throw new Error('Bạn cần chụp mặt trước khi chấm công.')
-  localStorage.setItem(`hrm_face_checked_${myEmployeeId.value}`, new Date().toISOString())
+  if (!facePreview.value) {
+    throw new Error('Bạn cần chụp mặt trước khi chấm công.')
+  }
+
   return true
 }
+
 function upsertLocalRecord(type) {
   const today = new Date().toISOString().slice(0, 10)
-  const existing = records.value.find((r) => recordEmployeeId(r) === myEmployeeId.value && String(recordDate(r)).slice(0, 10) === today)
+  const existing = records.value.find((record) => {
+    return recordEmployeeId(record) === myEmployeeId.value && String(recordDate(record)).slice(0, 10) === today
+  })
+
   if (type === 'in') {
     if (!existing) {
       records.value.push({
@@ -714,36 +1014,65 @@ function upsertLocalRecord(type) {
         workingDate: today,
         checkInTime: new Date().toISOString(),
         status: 'Present',
-        overtimeHours: 0,
+        overtimeHours: approvedOvertimeHours(today, myEmployeeId.value),
       })
     }
   } else if (existing) {
     existing.checkOutTime = new Date().toISOString()
+    existing.overtimeHours = approvedOvertimeHours(today, myEmployeeId.value)
   }
+
   persistLocalRecords()
 }
+
+function approvedOvertimeHours(dateValue, employeeId) {
+  return requests.value
+    .filter((request) => {
+      return (
+        request.type === 'overtime' &&
+        request.status === 'Approved' &&
+        request.employeeId === employeeId &&
+        request.date === dateValue
+      )
+    })
+    .reduce((sum, request) => sum + Number(request.hours || 0), 0)
+}
+
 async function faceCheckIn() {
   try {
     await verifyFacePhoto()
-    await attendanceApi.records.checkIn(myEmployeeId.value, {
-      checkInMethod: 'FaceID',
-      checkInPhotoUrl: `face-checkin-${myEmployeeId.value}-${Date.now()}.jpg`,
-    })
+
+    try {
+      await attendanceApi.records.checkIn(myEmployeeId.value, {
+        checkInMethod: 'FaceID',
+        checkInPhotoUrl: `face-checkin-${myEmployeeId.value}-${Date.now()}.jpg`,
+      })
+    } catch {
+      // Cho phép chạy demo khi backend N2 chưa sẵn sàng.
+    }
+
     upsertLocalRecord('in')
-    notify('Face check-in thành công.')
-    resetFace()
+    notify('Check-in thành công.')
+    closeFaceModal()
     await loadAll()
   } catch (error) {
     notify(error.message || 'Check-in thất bại.', 'error')
   }
 }
+
 async function faceCheckOut() {
   try {
     await verifyFacePhoto()
-    await attendanceApi.records.checkOut(myEmployeeId.value)
+
+    try {
+      await attendanceApi.records.checkOut(myEmployeeId.value)
+    } catch {
+      // Cho phép chạy demo khi backend N2 chưa sẵn sàng.
+    }
+
     upsertLocalRecord('out')
-    notify('Face check-out thành công.')
-    resetFace()
+    notify('Check-out thành công.')
+    closeFaceModal()
     await loadAll()
   } catch (error) {
     notify(error.message || 'Check-out thất bại.', 'error')
@@ -752,22 +1081,27 @@ async function faceCheckOut() {
 
 async function removeRecord(item) {
   if (!confirm('Xóa bản ghi chấm công này?')) return
+
   const id = recordId(item)
+
   try {
     if (String(id).startsWith('local-')) {
-      records.value = records.value.filter((r) => recordId(r) !== id)
+      records.value = records.value.filter((record) => recordId(record) !== id)
       persistLocalRecords()
     } else {
       await attendanceApi.records.remove(id)
-      records.value = records.value.filter((r) => recordId(r) !== id)
+      records.value = records.value.filter((record) => recordId(record) !== id)
     }
+
     notify('Đã xóa bản ghi.')
-  } catch (error) {
-    notify('Backend N2 hiện tại chưa hỗ trợ xóa bản ghi này. Cần deploy source N2 trong bản zip.', 'error')
+  } catch {
+    notify('Không xóa được bản ghi này.', 'error')
   }
 }
+
 async function monthlyClose() {
   loading.value = true
+
   try {
     monthlyPayload.value = unwrapList(await attendanceApi.records.monthlyClose(filter.month, filter.year))
     notify('Đã chốt công.')
@@ -777,441 +1111,756 @@ async function monthlyClose() {
     loading.value = false
   }
 }
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 function exportExcel() {
-  const rows = filteredRecords.value.map((r) => ({
-    employee: employeeLabel(recordEmployeeId(r)),
-    date: date(recordDate(r)),
-    checkIn: time(recordCheckIn(r)),
-    checkOut: time(recordCheckOut(r)),
-    workHours: workHours(r),
-    overtime: recordOvertime(r),
-    status: attendanceStatus(r),
+  const rows = filteredRecords.value.map((record) => ({
+    employee: employeeLabel(recordEmployeeId(record)),
+    date: date(recordDate(record)),
+    checkIn: time(recordCheckIn(record)),
+    checkOut: time(recordCheckOut(record)),
+    workHours: workHours(record),
+    overtime: recordOvertime(record),
+    status: attendanceStatus(record),
   }))
-  const html = `<table><tr><th>Nhân viên</th><th>Ngày</th><th>Check-in</th><th>Check-out</th><th>Giờ làm</th><th>OT</th><th>Trạng thái</th></tr>${rows
-    .map((r) => `<tr><td>${r.employee}</td><td>${r.date}</td><td>${r.checkIn}</td><td>${r.checkOut}</td><td>${r.workHours}</td><td>${r.overtime}</td><td>${r.status}</td></tr>`)
-    .join('')}</table>`
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel' })
+
+  const html = `<table>
+    <tr>
+      <th>Nhân viên</th>
+      <th>Ngày</th>
+      <th>Check-in</th>
+      <th>Check-out</th>
+      <th>Giờ làm</th>
+      <th>OT</th>
+      <th>Trạng thái</th>
+    </tr>
+    ${rows
+      .map(
+        (row) => `<tr>
+          <td>${escapeHtml(row.employee)}</td>
+          <td>${escapeHtml(row.date)}</td>
+          <td>${escapeHtml(row.checkIn)}</td>
+          <td>${escapeHtml(row.checkOut)}</td>
+          <td>${escapeHtml(row.workHours)}</td>
+          <td>${escapeHtml(row.overtime)}</td>
+          <td>${escapeHtml(row.status)}</td>
+        </tr>`
+      )
+      .join('')}
+  </table>`
+
+  const blob = new Blob([html], {
+    type: 'application/vnd.ms-excel',
+  })
+
   const link = document.createElement('a')
+
   link.href = URL.createObjectURL(blob)
   link.download = `attendance-${filter.month}-${filter.year}.xls`
   link.click()
+
   URL.revokeObjectURL(link.href)
 }
 
 onMounted(loadAll)
-onBeforeUnmount(stopCamera)
+
+onBeforeUnmount(() => {
+  stopCamera()
+})
 </script>
 
 <style scoped>
-.face-attendance-card {
-  overflow: hidden;
+.attendance-page {
+  font-family: "Segoe UI", Arial, sans-serif;
 }
 
-.camera-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.7fr);
-  gap: 24px;
-  align-items: stretch;
-  margin-top: 18px;
+.attendance-page :where(button, input, select, textarea, table) {
+  font-family: "Segoe UI", Arial, sans-serif;
 }
 
-.camera-main {
-  min-width: 0;
+.attendance-card {
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.06);
 }
 
-.camera-viewport {
-  position: relative;
-  width: 100%;
-  max-width: 760px;
-  aspect-ratio: 4 / 3;
-  min-height: 300px;
-  margin: 0 auto;
-  overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.38);
-  border-radius: 22px;
-  background:
-    radial-gradient(circle at 50% 30%, rgba(51, 65, 85, 0.88), rgba(15, 23, 42, 0.98) 62%),
-    #0f172a;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
-  isolation: isolate;
-}
-
-.camera-viewport::after {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: inherit;
-  pointer-events: none;
-  content: '';
-}
-
-.camera-viewport video,
-.camera-viewport img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-  object-position: center;
-}
-
-.camera-viewport video {
-  transform: scaleX(-1);
-}
-
-.camera-placeholder {
-  position: absolute;
-  inset: 0;
+.attendance-head,
+.history-head,
+.section-head {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.attendance-head h2,
+.history-head h2,
+.section-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.attendance-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.head-actions,
+.close-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  padding: 28px;
-  color: #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.head-actions select,
+.head-actions input,
+.close-actions input,
+.request-form input,
+.request-form select,
+.request-form textarea {
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+}
+
+.head-actions select {
+  min-width: 240px;
+  height: 44px;
+  padding: 0 13px;
+}
+
+.head-actions input,
+.close-actions input {
+  width: 88px;
+  height: 44px;
+  padding: 0 13px;
   text-align: center;
 }
 
-.camera-placeholder-icon {
+.btn.soft {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.work-layout {
   display: grid;
-  width: 72px;
-  height: 72px;
-  margin-bottom: 4px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 34px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
 }
 
-.camera-placeholder strong {
-  font-size: 1.05rem;
+.calendar-area {
+  min-width: 0;
 }
 
-.camera-placeholder small {
-  max-width: 340px;
-  color: #94a3b8;
-  line-height: 1.55;
+.weekday-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
-.face-guide {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
+.weekday-row span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
 }
 
-.face-guide-oval {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: clamp(170px, 38%, 275px);
-  height: clamp(235px, 64%, 390px);
-  border: 2px solid rgba(255, 255, 255, 0.92);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 999px rgba(2, 6, 23, 0.28),
-    0 0 28px rgba(255, 255, 255, 0.15);
-  transform: translate(-50%, -50%);
+.work-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.guide-corner {
-  position: absolute;
-  width: 38px;
-  height: 38px;
-  border-color: #60a5fa;
-  border-style: solid;
+.calendar-slot {
+  min-width: 0;
 }
 
-.guide-corner.top-left {
-  top: 22px;
-  left: 22px;
-  border-width: 3px 0 0 3px;
-  border-radius: 12px 0 0;
+.calendar-empty {
+  min-height: 114px;
 }
 
-.guide-corner.top-right {
-  top: 22px;
-  right: 22px;
-  border-width: 3px 3px 0 0;
-  border-radius: 0 12px 0 0;
+.day-card {
+  width: 100%;
+  min-height: 114px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.18s ease;
 }
 
-.guide-corner.bottom-left {
-  bottom: 22px;
-  left: 22px;
-  border-width: 0 0 3px 3px;
-  border-radius: 0 0 0 12px;
+.day-card:hover {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+  transform: translateY(-1px);
 }
 
-.guide-corner.bottom-right {
-  right: 22px;
-  bottom: 22px;
-  border-width: 0 3px 3px 0;
-  border-radius: 0 0 12px;
+.day-card.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
-.camera-status {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 5;
-  display: inline-flex;
+.day-card.work {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.day-card.holiday {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.day-card.leave {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.day-top {
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  max-width: calc(100% - 32px);
-  padding: 8px 12px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.72);
-  color: #e2e8f0;
-  font-size: 0.78rem;
-  font-weight: 700;
+}
+
+.day-top strong {
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 800;
   line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  backdrop-filter: blur(10px);
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: #94a3b8;
-  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.16);
+.day-top span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
 }
 
-.camera-status.live .status-dot {
-  background: #22c55e;
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
-  animation: camera-pulse 1.8s infinite;
+.day-card p {
+  margin: 14px 0 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
 }
 
-.camera-status.success .status-dot {
-  background: #38bdf8;
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
+.day-card small {
+  display: block;
+  margin-top: 6px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.camera-status.error .status-dot {
-  background: #ef4444;
-  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
-}
-
-.camera-hints {
+.day-badges {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 5px;
+  margin-top: 8px;
 }
 
-.camera-hints span {
+.mini-badge {
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.day-panel {
+  position: sticky;
+  top: 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.panel-head span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.panel-head h3 {
+  margin: 3px 0 0;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.close-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dbe3ef;
+  border-radius: 11px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.shift-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 13px 14px;
+  border-radius: 14px;
+}
+
+.shift-box span {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.shift-box strong {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.shift-box.is-work {
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+}
+
+.shift-box.is-off {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.panel-section {
+  margin-top: 16px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.section-title span,
+.section-head span {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 11px;
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 999px;
-  background: var(--surface-soft, #f8fafc);
-  color: var(--muted, #64748b);
-  font-size: 0.76rem;
-  line-height: 1.2;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
 }
 
-.camera-hints span::before {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: #3b82f6;
-  content: '';
+.employee-list {
+  display: grid;
+  gap: 8px;
 }
 
-.camera-control-panel {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  border: 1px solid var(--border, #e2e8f0);
-  border-radius: 20px;
-  background: var(--surface-soft, #f8fafc);
-}
-
-.camera-employee {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border, #e2e8f0);
-}
-
-.camera-employee-label {
-  color: var(--muted, #64748b);
-  font-size: 0.76rem;
+.employee-chip {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 9px 10px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
-.camera-employee strong {
-  overflow-wrap: anywhere;
-  color: var(--text, #0f172a);
-  font-size: 0.98rem;
-  line-height: 1.45;
+.request-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.camera-instruction {
-  padding: 14px;
-  border: 1px solid rgba(59, 130, 246, 0.18);
-  border-radius: 14px;
-  background: rgba(59, 130, 246, 0.07);
+.tab-btn {
+  height: 40px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-.camera-instruction strong {
+.tab-btn.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.request-form {
+  display: grid;
+  gap: 8px;
+}
+
+.request-form label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.request-form input,
+.request-form select {
+  height: 42px;
+  padding: 0 12px;
+}
+
+.request-form textarea {
+  resize: vertical;
+  padding: 10px 12px;
+}
+
+.btn.full {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.request-list {
+  display: grid;
+  gap: 8px;
+}
+
+.request-list.self {
+  margin-top: 12px;
+}
+
+.request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.request-row strong {
   display: block;
-  margin-bottom: 5px;
-  color: var(--text, #0f172a);
-  font-size: 0.88rem;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
 }
 
-.camera-instruction p {
-  margin: 0;
-  color: var(--muted, #64748b);
-  font-size: 0.8rem;
-  line-height: 1.55;
+.request-row small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.request-row span {
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.request-row span.pending {
+  color: #c2410c;
+}
+
+.request-row span.approved {
+  color: #15803d;
+}
+
+.request-row span.rejected {
+  color: #dc2626;
+}
+
+.empty-panel {
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: #64748b;
+  text-align: center;
+}
+
+.empty-panel strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.approval-card,
+.history-card,
+.close-card,
+.schedule-card {
+  padding: 22px 24px;
+  margin-bottom: 20px;
+}
+
+.approval-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.approval-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 15px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.approval-item strong {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.approval-item p {
+  margin: 4px 0;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.approval-item small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-wrap th {
+  background: #f8fafc;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.table-wrap td {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.name-cell strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.actions.right {
+  justify-content: flex-end;
+}
+
+.icon-action {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  background: #f8fafc;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.icon-action.danger {
+  border-color: #fee2e2;
+  background: #fff7f7;
+  color: #dc2626;
+}
+
+.icon-action.danger:hover {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.pill.warn {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.payload-box {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 14px;
+  font-size: 13px;
+}
+
+.face-modal {
+  max-width: 760px;
+}
+
+.face-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.face-box {
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.face-box video,
+.face-box img {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  object-fit: cover;
+  display: block;
+}
+
+.face-placeholder {
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: #64748b;
+}
+
+.face-placeholder strong {
+  color: #0f172a;
+  font-size: 24px;
+}
+
+.face-placeholder span {
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .face-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: auto;
+  align-content: start;
 }
 
-.face-actions .btn {
-  width: 100%;
-  min-height: 42px;
-  padding-inline: 12px;
-  white-space: normal;
-}
-
-.camera-action-wide {
-  grid-column: 1 / -1;
-}
-
-.camera-note {
-  display: block;
-  color: var(--muted, #64748b);
-  font-size: 0.72rem;
-  line-height: 1.5;
-  text-align: center;
-}
-
-@keyframes camera-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.45;
-  }
-}
-
-@media (max-width: 980px) {
-  .camera-workspace {
+@media (max-width: 1180px) {
+  .work-layout {
     grid-template-columns: 1fr;
   }
 
-  .camera-control-panel {
-    width: 100%;
+  .day-panel {
+    position: static;
   }
 
-  .face-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .camera-action-wide {
-    grid-column: auto;
+  .approval-grid {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 700px) {
-  .camera-workspace {
-    gap: 16px;
+@media (max-width: 768px) {
+  .attendance-head,
+  .history-head,
+  .section-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  .camera-viewport {
-    min-height: 0;
-    border-radius: 16px;
+  .head-actions,
+  .close-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
-  .camera-control-panel {
-    padding: 16px;
-    border-radius: 16px;
+  .head-actions select {
+    width: 100%;
+    min-width: 0;
   }
 
-  .face-actions {
+  .weekday-row {
+    display: none;
+  }
+
+  .work-calendar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .camera-action-wide {
-    grid-column: 1 / -1;
+  .calendar-empty {
+    display: none;
   }
 
-  .camera-hints {
-    justify-content: flex-start;
-  }
-}
-
-@media (max-width: 460px) {
-  .camera-status {
-    top: 10px;
-    left: 10px;
-    max-width: calc(100% - 20px);
-    padding: 7px 10px;
+  .day-card {
+    min-height: 96px;
   }
 
-  .face-guide-oval {
-    width: 42%;
-    height: 66%;
-  }
-
-  .guide-corner {
-    width: 28px;
-    height: 28px;
-  }
-
-  .guide-corner.top-left {
-    top: 14px;
-    left: 14px;
-  }
-
-  .guide-corner.top-right {
-    top: 14px;
-    right: 14px;
-  }
-
-  .guide-corner.bottom-left {
-    bottom: 14px;
-    left: 14px;
-  }
-
-  .guide-corner.bottom-right {
-    right: 14px;
-    bottom: 14px;
-  }
-
-  .face-actions {
+  .face-layout {
     grid-template-columns: 1fr;
-  }
-
-  .camera-action-wide {
-    grid-column: auto;
   }
 }
 </style>
